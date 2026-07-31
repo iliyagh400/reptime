@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+// import 'login_page.dart';
+import 'signup_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -19,12 +20,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Reptime',
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Reptime')),
-        body: const Center(
-          child: Text('اتصال به Supabase با موفقیت انجام شد ✅'),
-        ),
-      ),
-    );
+      home: const SignupPage(),
+        )
+  ;
   }
 }
