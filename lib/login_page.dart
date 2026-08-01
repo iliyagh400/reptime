@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -10,6 +11,32 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _login() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ورود موفق بود ✅')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +58,12 @@ class _LoginPageState extends State<LoginPage> {
               obscureText: true,
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                // بعداً اینجا وصل می‌کنیم به Supabase
-              },
-              child: const Text('ورود'),
-            ),
+            _isLoading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _login,
+                    child: const Text('ورود'),
+                  ),
           ],
         ),
       ),
