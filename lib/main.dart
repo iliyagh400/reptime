@@ -20,7 +20,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Reptime',
-      home: const  LoginPage(),
+      home: Supabase.instance.client.auth.currentSession != null
+    ? const Scaffold(body: Center(child: Text('خوش اومدی، لاگین کردی ✅')))
+    : const LoginPage(),
         )
   ;
   }
