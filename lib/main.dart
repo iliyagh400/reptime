@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_page.dart';
-// import 'signup_page.dart';
+import 'edit_pet_page.dart';
+import 'signup_page.dart';
+import 'home_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -21,7 +23,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Reptime',
       home: Supabase.instance.client.auth.currentSession != null
-    ? const Scaffold(body: Center(child: Text('خوش اومدی، لاگین کردی ✅')))
+    ? const HomePage()
     : const LoginPage(),
         )
   ;

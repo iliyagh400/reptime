@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,9 +24,10 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ورود موفق بود ✅')),
-        );
+         Navigator.pushReplacement(
+           context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+            );
       }
     } catch (e) {
       if (mounted) {

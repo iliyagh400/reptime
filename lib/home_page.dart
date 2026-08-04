@@ -1,0 +1,75 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'add_pet_page.dart';
+import 'edit_pet_page.dart';
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  List<Map<String, dynamic>> _pets = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPets();
+  }
+
+  Future<void> _loadPets() async {
+    setState(() => _isLoading = true);
+
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final response = await Supabase.instance.client
+        .from('pets')
+        .select()
+        .eq('user_id', userId);
+
+    setState(() {
+      _pets = List<Map<String, dynamic>>.from(response);
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('حیوانات من')),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _pets.isEmpty
+              ? const Center(child: Text('هنوز حیوونی اضافه نکردی'))
+              : ListView.builder(
+                  itemCount: _pets.length,
+                  itemBuilder: (context, index) {
+                    final pet = _pets[index];
+                   return ListTile(
+                      title: Text(pet['name'] ?? ''),
+                      subtitle: Text(pet['breed'] ?? ''),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => EditPetPage(pet: pet)),
+                        );
+                        _loadPets();
+                      },
+                    );
+                  },
+                ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddPetPage()),
+          );
+          _loadPets(); // بعد از برگشت، لیست رو دوباره بخون
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
