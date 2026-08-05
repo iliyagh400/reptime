@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_pet_page.dart';
 import 'edit_pet_page.dart';
+import 'add_routine_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -38,7 +39,24 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('حیوانات من')),
+      appBar: AppBar(
+          title: const Text('حیوانات من'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.alarm_add),
+              onPressed: _pets.isEmpty
+                  ? null
+                  : () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddRoutinePage(pets: _pets),
+                        ),
+                      );
+                    },
+            ),
+          ],
+          ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _pets.isEmpty
