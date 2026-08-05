@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_pet_page.dart';
-import 'edit_pet_page.dart';
+import 'pet_profile_page.dart';
 import 'add_routine_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -71,7 +71,7 @@ class _HomePageState extends State<HomePage> {
                       onTap: () async {
                         await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => EditPetPage(pet: pet)),
+                          MaterialPageRoute(builder: (context) => PetProfilePage(pet: pet)),
                         );
                         _loadPets();
                       },
