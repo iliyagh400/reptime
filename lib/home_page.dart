@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_pet_page.dart';
 import 'pet_profile_page.dart';
 import 'add_routine_page.dart';
+import 'notification_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -42,20 +43,40 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
           title: const Text('حیوانات من'),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.alarm_add),
-              onPressed: _pets.isEmpty
-                  ? null
-                  : () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AddRoutinePage(pets: _pets),
-                        ),
-                      );
-                    },
-            ),
-          ],
+IconButton(
+  icon: const Icon(Icons.bug_report),
+  onPressed: () async {
+    print('دکمه زده شد!');
+    final now = DateTime.now().add(const Duration(minutes: 1));
+    print('زمان الان: ${DateTime.now()} - زمان‌بندی برای: $now');
+    try {
+      await NotificationService.scheduleDailyNotification(
+        id: 999,
+        title: 'تست زمان‌بندی',
+        body: 'این باید یک دقیقه دیگه بیاد ✅',
+        hour: now.hour,
+        minute: now.minute,
+      );
+      print('زمان‌بندی با موفقیت انجام شد ✅');
+    } catch (e) {
+      print('خطا در زمان‌بندی: $e');
+    }
+  },
+),
+  IconButton(
+    icon: const Icon(Icons.alarm_add),
+    onPressed: _pets.isEmpty
+        ? null
+        : () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddRoutinePage(pets: _pets),
+              ),
+            );
+          },
+  ),
+],
           ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

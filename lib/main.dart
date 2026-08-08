@@ -4,9 +4,10 @@ import 'login_page.dart';
 import 'edit_pet_page.dart';
 import 'signup_page.dart';
 import 'home_page.dart';
+import 'notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await NotificationService.init();
   await Supabase.initialize(
     url: 'https://psxcktkkrgtzudpcwiei.supabase.co',
     publishableKey: 'sb_publishable_lK-ZFUm1Ni8Ax8aM93m0jg_Tx_225Uc',
