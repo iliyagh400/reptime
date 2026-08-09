@@ -89,6 +89,24 @@ class _PetProfilePageState extends State<PetProfilePage> {
                       title: Text(r['title'] ?? ''),
                       subtitle: Text(
                           '${_typeLabel(r['type'])} · ${r['time'] ?? ''}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.check_circle_outline),
+                        onPressed: () async {
+                          final userId = Supabase.instance.client.auth.currentUser!.id;
+                          await Supabase.instance.client.from('completions').insert({
+                            'user_id': userId,
+                            'routine_id': r['id'],
+                            'pet_id': widget.pet['id'],
+                            'completed_at': DateTime.now().toIso8601String(),
+                            'status': 'done',
+                          });
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('ثبت شد ✅')),
+                            );
+                          }
+                        },
+                      ),
                     );
                   },
                 ),

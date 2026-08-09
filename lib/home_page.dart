@@ -36,7 +36,19 @@ class _HomePageState extends State<HomePage> {
       _isLoading = false;
     });
   }
+  Future<bool> _hasCompletionToday(dynamic petId) async {
+  final userId = Supabase.instance.client.auth.currentUser!.id;
+  final todayStart = DateTime.now().toIso8601String().substring(0, 10);
 
+  final response = await Supabase.instance.client
+      .from('completions')
+      .select()
+      .eq('user_id', userId)
+      .eq('pet_id', petId)
+      .gte('completed_at', todayStart);
+
+  return (response as List).isNotEmpty;
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,17 +98,28 @@ IconButton(
                   itemCount: _pets.length,
                   itemBuilder: (context, index) {
                     final pet = _pets[index];
-                   return ListTile(
-                      title: Text(pet['name'] ?? ''),
-                      subtitle: Text(pet['breed'] ?? ''),
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => PetProfilePage(pet: pet)),
+                      return FutureBuilder<bool>(
+                        future: _hasCompletionToday(pet['id']),
+                          builder: (context, snapshot) {
+                            final hasCompletion = snapshot.data ?? false;
+                            return ListTile(
+                              leading: Icon(
+                                Icons.circle,
+                                size: 14,
+                                color: hasCompletion ? Colors.green : Colors.orange,
+                              ),
+                              title: Text(pet['name'] ?? ''),
+                              subtitle: Text(pet['breed'] ?? ''),
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => PetProfilePage(pet: pet)),
+                                );
+                                setState(() {}); // برای رفرش‌شدن رنگ گیج بعد از برگشت
+                              },
+                            );
+                          },
                         );
-                        _loadPets();
-                      },
-                    );
                   },
                 ),
       floatingActionButton: FloatingActionButton(
