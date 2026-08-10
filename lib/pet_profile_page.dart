@@ -109,6 +109,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
                             'routine_id': r['id'],
                             'pet_id': widget.pet['id'],
                             'completed_at': DateTime.now().toIso8601String(),
+                            
                             'status': 'done',
                           });
                           if (context.mounted) {
