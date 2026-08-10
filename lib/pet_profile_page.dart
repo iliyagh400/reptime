@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_pet_page.dart';
 import 'add_routine_page.dart';
+import 'edit_routine_page.dart';
 
 class PetProfilePage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -30,7 +31,6 @@ class _PetProfilePageState extends State<PetProfilePage> {
         .select()
         .eq('user_id', userId);
 
-    // فقط روتین‌هایی که این حیوون توی pet_ids شونه رو نگه می‌داریم
     final petId = widget.pet['id'];
     final allRoutines = List<Map<String, dynamic>>.from(response);
     final filtered = allRoutines.where((r) {
@@ -89,10 +89,21 @@ class _PetProfilePageState extends State<PetProfilePage> {
                       title: Text(r['title'] ?? ''),
                       subtitle: Text(
                           '${_typeLabel(r['type'])} · ${r['time'] ?? ''}'),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EditRoutinePage(routine: r, pets: [widget.pet]),
+                          ),
+                        );
+                        _loadRoutines();
+                      },
                       trailing: IconButton(
                         icon: const Icon(Icons.check_circle_outline),
                         onPressed: () async {
-                          final userId = Supabase.instance.client.auth.currentUser!.id;
+                          final userId =
+                              Supabase.instance.client.auth.currentUser!.id;
                           await Supabase.instance.client.from('completions').insert({
                             'user_id': userId,
                             'routine_id': r['id'],
