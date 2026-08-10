@@ -4,7 +4,7 @@ import 'add_pet_page.dart';
 import 'pet_profile_page.dart';
 import 'add_routine_page.dart';
 import 'notification_service.dart';
-
+import 'settings_page.dart';
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -87,6 +87,15 @@ IconButton(
               ),
             );
           },
+  ),
+  IconButton(
+    icon: const Icon(Icons.settings),
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsPage()),
+      );
+    },
   ),
 ],
           ),
