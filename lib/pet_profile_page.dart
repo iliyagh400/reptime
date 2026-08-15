@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_pet_page.dart';
 import 'add_routine_page.dart';
 import 'edit_routine_page.dart';
+import 'routine_logic.dart';
 
 class PetProfilePage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -26,20 +27,42 @@ class _PetProfilePageState extends State<PetProfilePage> {
     setState(() => _isLoading = true);
 
     final userId = Supabase.instance.client.auth.currentUser!.id;
-    final response = await Supabase.instance.client
+    final petId = widget.pet['id'];
+
+    final routinesResponse = await Supabase.instance.client
         .from('routines')
         .select()
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .eq('is_active', true);
 
-    final petId = widget.pet['id'];
-    final allRoutines = List<Map<String, dynamic>>.from(response);
-    final filtered = allRoutines.where((r) {
+    final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
+    final petRoutines = allRoutines.where((r) {
       final ids = List.from(r['pet_ids'] ?? []);
       return ids.contains(petId);
     }).toList();
 
+    final completionsResponse = await Supabase.instance.client
+        .from('completions')
+        .select()
+        .eq('user_id', userId)
+        .eq('pet_id', petId)
+        .eq('status', 'done');
+
+    final completions = List<Map<String, dynamic>>.from(completionsResponse);
+
+    final List<Map<String, dynamic>> relevantToday = [];
+
+    for (final routine in petRoutines) {
+      if (isRelevantToday(routine, completions)) {
+        relevantToday.add({
+          ...routine,
+          'isDoneToday': isDoneToday(routine, completions),
+        });
+      }
+    }
+
     setState(() {
-      _routines = filtered;
+      _routines = relevantToday;
       _isLoading = false;
     });
   }
@@ -80,12 +103,19 @@ class _PetProfilePageState extends State<PetProfilePage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _routines.isEmpty
-              ? const Center(child: Text('هنوز روتینی برای این حیوون نیست'))
+              ? const Center(child: Text('امروز کاری برای این حیوون نیست 🎉'))
               : ListView.builder(
                   itemCount: _routines.length,
                   itemBuilder: (context, index) {
                     final r = _routines[index];
+                    final doneToday = r['isDoneToday'] == true;
                     return ListTile(
+                      leading: Icon(
+                        doneToday
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
+                        color: doneToday ? Colors.green : Colors.orange,
+                      ),
                       title: Text(r['title'] ?? ''),
                       subtitle: Text(
                           '${_typeLabel(r['type'])} · ${r['time'] ?? ''}'),
@@ -93,32 +123,38 @@ class _PetProfilePageState extends State<PetProfilePage> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                EditRoutinePage(routine: r, pets: [widget.pet]),
+                            builder: (context) => EditRoutinePage(
+                                routine: r, pets: [widget.pet]),
                           ),
                         );
                         _loadRoutines();
                       },
-                      trailing: IconButton(
-                        icon: const Icon(Icons.check_circle_outline),
-                        onPressed: () async {
-                          final userId =
-                              Supabase.instance.client.auth.currentUser!.id;
-                          await Supabase.instance.client.from('completions').insert({
-                            'user_id': userId,
-                            'routine_id': r['id'],
-                            'pet_id': widget.pet['id'],
-                            'completed_at': DateTime.now().toIso8601String(),
-                            
-                            'status': 'done',
-                          });
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('ثبت شد ✅')),
-                            );
-                          }
-                        },
-                      ),
+                      trailing: doneToday
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.check_circle_outline),
+                              onPressed: () async {
+                                final userId = Supabase
+                                    .instance.client.auth.currentUser!.id;
+                                await Supabase.instance.client
+                                    .from('completions')
+                                    .insert({
+                                  'user_id': userId,
+                                  'routine_id': r['id'],
+                                  'pet_id': widget.pet['id'],
+                                  'completed_at':
+                                      DateTime.now().toIso8601String(),
+                                  'status': 'done',
+                                });
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('ثبت شد ✅')),
+                                  );
+                                }
+                                _loadRoutines();
+                              },
+                            ),
                     );
                   },
                 ),
