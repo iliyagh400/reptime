@@ -99,6 +99,21 @@ class _EditPetPageState extends State<EditPetPage> {
     }
   }
 
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[600],
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,15 +121,34 @@ class _EditPetPageState extends State<EditPetPage> {
         title: const Text('ویرایش حیوان'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete),
+            icon: const Icon(Icons.delete_outline),
             onPressed: _deletePet,
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: ListView(
           children: [
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3B679),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Image.asset(
+                    'assets/icons/ballpic.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+            _sectionLabel('مشخصات پایه'),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'اسم'),
@@ -129,7 +163,7 @@ class _EditPetPageState extends State<EditPetPage> {
               controller: _breedController,
               decoration: const InputDecoration(labelText: 'گونه/نژاد'),
             ),
-            const SizedBox(height: 12),
+            _sectionLabel('جزئیات بیشتر'),
             TextField(
               controller: _genderController,
               decoration: const InputDecoration(labelText: 'جنسیت'),
@@ -145,13 +179,14 @@ class _EditPetPageState extends State<EditPetPage> {
               decoration: const InputDecoration(labelText: 'وزن (گرم)'),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 28),
             _isLoading
-                ? const CircularProgressIndicator()
+                ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
                     onPressed: _updatePet,
                     child: const Text('ذخیره تغییرات'),
                   ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

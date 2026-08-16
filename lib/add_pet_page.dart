@@ -50,14 +50,31 @@ class _AddPetPageState extends State<AddPetPage> {
     }
   }
 
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[600],
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('افزودن حیوان')),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: ListView(
           children: [
+            const SizedBox(height: 12),
+            _sectionLabel('مشخصات پایه'),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'اسم'),
@@ -72,7 +89,7 @@ class _AddPetPageState extends State<AddPetPage> {
               controller: _breedController,
               decoration: const InputDecoration(labelText: 'گونه/نژاد'),
             ),
-            const SizedBox(height: 12),
+            _sectionLabel('جزئیات بیشتر'),
             TextField(
               controller: _genderController,
               decoration: const InputDecoration(labelText: 'جنسیت'),
@@ -88,13 +105,14 @@ class _AddPetPageState extends State<AddPetPage> {
               decoration: const InputDecoration(labelText: 'وزن (گرم)'),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 28),
             _isLoading
-                ? const CircularProgressIndicator()
+                ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
                     onPressed: _savePet,
                     child: const Text('ذخیره'),
                   ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
