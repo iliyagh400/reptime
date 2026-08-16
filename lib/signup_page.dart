@@ -26,6 +26,7 @@ class _SignupPageState extends State<SignupPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ثبت‌نام موفق بود ✅')),
         );
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -41,30 +42,75 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ثبت‌نام')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'ایمیل'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'رمز عبور'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 20),
-            _isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _signUp,
-                    child: const Text('ثبت‌نام'),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 50),
+              IconButton(
+                alignment: Alignment.centerLeft,
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3F5D45),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-          ],
+                  child: const Center(
+                    child: Text(
+                      'R',
+                      style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'ساخت حساب جدید',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3F5D45),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'به رپتایم خوش اومدی حسابتو بساز تا شروع کنیم',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 36),
+              TextField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'ایمیل'),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'رمز عبور'),
+                obscureText: true,
+              ),
+              const SizedBox(height: 24),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                      onPressed: _signUp,
+                      child: const Text('ثبت‌نام'),
+                    ),
+            ],
+          ),
         ),
       ),
     );
