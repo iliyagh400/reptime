@@ -15,6 +15,7 @@ class PetProfilePage extends StatefulWidget {
 
 class _PetProfilePageState extends State<PetProfilePage> {
   List<Map<String, dynamic>> _routines = [];
+  List<Map<String, dynamic>> _allPets = [];
   bool _isLoading = true;
 
   @override
@@ -28,6 +29,12 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
     final userId = Supabase.instance.client.auth.currentUser!.id;
     final petId = widget.pet['id'];
+
+    final allPetsResponse = await Supabase.instance.client
+        .from('pets')
+        .select()
+        .eq('user_id', userId);
+    _allPets = List<Map<String, dynamic>>.from(allPetsResponse);
 
     final routinesResponse = await Supabase.instance.client
         .from('routines')
@@ -259,7 +266,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
                                         builder: (context) =>
                                             EditRoutinePage(
                                                 routine: r,
-                                                pets: [widget.pet]),
+                                                pets: _allPets),
                                       ),
                                     );
                                     _loadRoutines();
@@ -383,7 +390,10 @@ class _PetProfilePageState extends State<PetProfilePage> {
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AddRoutinePage(pets: [widget.pet]),
+              builder: (context) => AddRoutinePage(
+                pets: _allPets,
+                initialSelectedPetId: widget.pet['id'],
+              ),
             ),
           );
           _loadRoutines();

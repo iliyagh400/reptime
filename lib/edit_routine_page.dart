@@ -23,6 +23,8 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
 
   final _weekdayOptions = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
+  static const _green = Color(0xFF3F5D45);
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +117,52 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     }
   }
 
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 18, 4, 10),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[600],
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _themedChoiceChip(String label, bool selected, VoidCallback onTap) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: _green,
+      backgroundColor: Colors.white,
+      side: BorderSide(color: selected ? _green : const Color(0xFFC9D0BA)),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.black87,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _themedFilterChip(
+      String label, bool selected, ValueChanged<bool> onChanged) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onChanged,
+      selectedColor: _green,
+      backgroundColor: Colors.white,
+      side: BorderSide(color: selected ? _green : const Color(0xFFC9D0BA)),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.black87,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,56 +170,45 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
         title: const Text('ویرایش روتین'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete),
+            icon: const Icon(Icons.delete_outline),
             onPressed: _deleteRoutine,
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: ListView(
           children: [
+            const SizedBox(height: 12),
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(labelText: 'عنوان'),
             ),
-            const SizedBox(height: 16),
-            const Text('نوع'),
+            _sectionLabel('نوع'),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
-                ChoiceChip(
-                  label: const Text('غذا'),
-                  selected: _type == 'food',
-                  onSelected: (_) => setState(() => _type = 'food'),
-                ),
-                ChoiceChip(
-                  label: const Text('نظافت'),
-                  selected: _type == 'cleaning',
-                  onSelected: (_) => setState(() => _type = 'cleaning'),
-                ),
-                ChoiceChip(
-                  label: const Text('دارو'),
-                  selected: _type == 'medicine',
-                  onSelected: (_) => setState(() => _type = 'medicine'),
-                ),
-                ChoiceChip(
-                  label: const Text('دیگر'),
-                  selected: _type == 'other',
-                  onSelected: (_) => setState(() => _type = 'other'),
-                ),
+                _themedChoiceChip('غذا', _type == 'food',
+                    () => setState(() => _type = 'food')),
+                _themedChoiceChip('نظافت', _type == 'cleaning',
+                    () => setState(() => _type = 'cleaning')),
+                _themedChoiceChip('دارو', _type == 'medicine',
+                    () => setState(() => _type = 'medicine')),
+                _themedChoiceChip('دیگر', _type == 'other',
+                    () => setState(() => _type = 'other')),
               ],
             ),
-            const SizedBox(height: 16),
-            const Text('حیوان‌ها'),
+            _sectionLabel('حیوان‌ها'),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: widget.pets.map((pet) {
                 final id = pet['id'].toString();
-                return FilterChip(
-                  label: Text(pet['name'] ?? ''),
-                  selected: _selectedPetIds.contains(id),
-                  onSelected: (selected) {
+                return _themedFilterChip(
+                  pet['name'] ?? '',
+                  _selectedPetIds.contains(id),
+                  (selected) {
                     setState(() {
                       if (selected) {
                         _selectedPetIds.add(id);
@@ -183,53 +220,41 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 16),
+            _sectionLabel('زمان‌بندی'),
             TextField(
               controller: _timeController,
               decoration:
                   const InputDecoration(labelText: 'ساعت (مثلاً 08:00)'),
             ),
-            const SizedBox(height: 16),
-            const Text('نوع تکرار'),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
-                ChoiceChip(
-                  label: const Text('روزانه'),
-                  selected: _repeatType == 'daily',
-                  onSelected: (_) => setState(() => _repeatType = 'daily'),
-                ),
-                ChoiceChip(
-                  label: const Text('هفتگی'),
-                  selected: _repeatType == 'weekly',
-                  onSelected: (_) => setState(() => _repeatType = 'weekly'),
-                ),
-                ChoiceChip(
-                  label: const Text('ماهانه'),
-                  selected: _repeatType == 'monthly',
-                  onSelected: (_) => setState(() => _repeatType = 'monthly'),
-                ),
-                ChoiceChip(
-                  label: const Text('بازه‌ای (هر N روز)'),
-                  selected: _repeatType == 'interval',
-                  onSelected: (_) => setState(() => _repeatType = 'interval'),
-                ),
-                ChoiceChip(
-                  label: const Text('یک‌بار'),
-                  selected: _repeatType == 'once',
-                  onSelected: (_) => setState(() => _repeatType = 'once'),
-                ),
+                _themedChoiceChip('روزانه', _repeatType == 'daily',
+                    () => setState(() => _repeatType = 'daily')),
+                _themedChoiceChip('هفتگی', _repeatType == 'weekly',
+                    () => setState(() => _repeatType = 'weekly')),
+                _themedChoiceChip('ماهانه', _repeatType == 'monthly',
+                    () => setState(() => _repeatType = 'monthly')),
+                _themedChoiceChip(
+                    'بازه‌ای (هر N روز)',
+                    _repeatType == 'interval',
+                    () => setState(() => _repeatType = 'interval')),
+                _themedChoiceChip('یک‌بار', _repeatType == 'once',
+                    () => setState(() => _repeatType = 'once')),
               ],
             ),
-            const SizedBox(height: 12),
-            if (_repeatType == 'weekly')
+            if (_repeatType == 'weekly') ...[
+              const SizedBox(height: 14),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: _weekdayOptions.map((day) {
-                  return FilterChip(
-                    label: Text(day),
-                    selected: _selectedWeekdays.contains(day),
-                    onSelected: (selected) {
+                  return _themedFilterChip(
+                    day,
+                    _selectedWeekdays.contains(day),
+                    (selected) {
                       setState(() {
                         if (selected) {
                           _selectedWeekdays.add(day);
@@ -241,20 +266,24 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
                   );
                 }).toList(),
               ),
-            if (_repeatType == 'interval')
+            ],
+            if (_repeatType == 'interval') ...[
+              const SizedBox(height: 14),
               TextField(
                 controller: _intervalController,
                 decoration:
                     const InputDecoration(labelText: 'هر چند روز؟ (مثلاً 5)'),
                 keyboardType: TextInputType.number,
               ),
-            const SizedBox(height: 24),
+            ],
+            const SizedBox(height: 28),
             _isLoading
-                ? const CircularProgressIndicator()
+                ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
                     onPressed: _updateRoutine,
                     child: const Text('ذخیره تغییرات'),
                   ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
