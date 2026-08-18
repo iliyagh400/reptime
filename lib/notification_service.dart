@@ -33,6 +33,29 @@ class NotificationService {
     );
   }
 
+  static String _typeLabelFa(String? type) {
+    switch (type) {
+      case 'food':
+        return 'غذا';
+      case 'cleaning':
+        return 'نظافت';
+      case 'medicine':
+        return 'دارو';
+      default:
+        return 'رسیدگی';
+    }
+  }
+
+  static String _buildBody(Map<String, dynamic> routine, List<String>? petNames) {
+    final typeLabel = _typeLabelFa(routine['type']);
+    if (petNames == null || petNames.isEmpty) {
+      return 'وقت انجام این روتینه 🐾';
+    }
+    final namesJoined = petNames.join(' و ');
+    final verb = petNames.length > 1 ? 'دارن' : 'داره';
+    return 'امروز $namesJoined نیاز به $typeLabel $verb 🐾';
+  }
+
   // ---------- existing generic helpers (kept for the debug button) ----------
 
   static Future<void> scheduleDailyNotification({
@@ -130,6 +153,7 @@ class NotificationService {
   static Future<void> scheduleRoutineNotifications(
     Map<String, dynamic> routine, {
     DateTime? overrideDate,
+    List<String>? petNames,
   }) async {
     await cancelRoutineNotifications(routine['id']);
 
@@ -146,7 +170,7 @@ class NotificationService {
     if (hour == null || minute == null) return;
 
     final title = routine['title'] ?? 'یادآوری روتین';
-    const body = 'وقت انجام این روتینه 🐾';
+    final body = _buildBody(routine, petNames);
     final baseId = _baseIdForRoutine(routine['id']);
     final repeatType = routine['repeat_type'];
 
@@ -233,5 +257,27 @@ class NotificationService {
         );
         break;
     }
+  }
+
+  // ---------- daily summary (static reminder at a fixed hour) ----------
+
+  static const int _dailySummaryId = 90000;
+
+  static Future<void> updateDailySummaryNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('daily_summary') ?? false;
+
+    await _notifications.cancel(id: _dailySummaryId);
+    if (!enabled) return;
+
+    await _notifications.zonedSchedule(
+      id: _dailySummaryId,
+      title: 'خلاصه‌ی امروز',
+      body: 'وقتشه خلاصه‌ی کارهای امروز حیوون‌هاتو تو اپ چک کنی 📋',
+      scheduledDate: _nextInstanceOfTime(21, 0),
+      notificationDetails: _defaultDetails(),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
   }
 }

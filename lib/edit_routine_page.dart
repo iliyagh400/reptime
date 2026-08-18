@@ -69,7 +69,14 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
           .select()
           .single();
 
-      await NotificationService.scheduleRoutineNotifications(updated);
+      final petNames = widget.pets
+              .where((p) => _selectedPetIds.contains(p['id'].toString()))
+              .map((p) => p['name'] as String)
+              .toList();
+          await NotificationService.scheduleRoutineNotifications(
+            updated,
+            petNames: petNames,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

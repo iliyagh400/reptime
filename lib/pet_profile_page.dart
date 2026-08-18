@@ -109,9 +109,15 @@ class _PetProfilePageState extends State<PetProfilePage> {
         await NotificationService.cancelRoutineNotifications(routine['id']);
       } else {
         final next = nextDueDate(routine, completions);
+        final petIds = List.from(routine['pet_ids'] ?? []);
+        final petNames = _allPets
+            .where((p) => petIds.contains(p['id']))
+            .map((p) => p['name'] as String)
+            .toList();
         await NotificationService.scheduleRoutineNotifications(
           routine,
           overrideDate: next,
+          petNames: petNames,
         );
       }
     }

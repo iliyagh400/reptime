@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'notification_service.dart';
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -88,10 +88,11 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: const Text('نوتیفیکیشن سر وقت'),
                     subtitle: const Text('دقیقاً سر ساعت روتین'),
                     value: _onTimeReminders,
-                    onChanged: (value) {
-                      setState(() => _onTimeReminders = value);
-                      _saveBool('on_time_reminders', value);
-                    },
+                    onChanged: (value) async {
+                        setState(() => _dailySummary = value);
+                        await _saveBool('daily_summary', value);
+                        await NotificationService.updateDailySummaryNotification();
+                      },
                   ),
                 ),
                 _sectionLabel('کارهای دیرشده'),
