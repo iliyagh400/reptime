@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
   static final _notifications = FlutterLocalNotificationsPlugin();
@@ -10,7 +11,7 @@ class NotificationService {
     tz_data.initializeTimeZones();
     final timezoneInfo = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
-    
+
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidSettings);
 
@@ -20,6 +21,19 @@ class NotificationService {
     await androidImpl?.requestNotificationsPermission();
     await androidImpl?.requestExactAlarmsPermission();
   }
+
+  static NotificationDetails _defaultDetails() {
+    return const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'routine_channel',
+        'یادآور روتین',
+        importance: Importance.max,
+        priority: Priority.high,
+      ),
+    );
+  }
+
+  // ---------- existing generic helpers (kept for the debug button) ----------
 
   static Future<void> scheduleDailyNotification({
     required int id,
@@ -33,14 +47,7 @@ class NotificationService {
       title: title,
       body: body,
       scheduledDate: _nextInstanceOfTime(hour, minute),
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'routine_channel',
-          'یادآور روتین',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
+      notificationDetails: _defaultDetails(),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
@@ -48,7 +55,8 @@ class NotificationService {
 
   static tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    var scheduled =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
@@ -64,14 +72,166 @@ class NotificationService {
       id: 998,
       title: 'تست فوری',
       body: 'این نوتیف باید همین الان بیاد ✅',
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'routine_channel',
-          'یادآور روتین',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
+      notificationDetails: _defaultDetails(),
     );
+  }
+
+  // ---------- real per-routine scheduling ----------
+
+  /// Notification ids for a given routine live in a reserved range so they
+  /// never collide with each other or with the debug-button ids (998/999).
+  /// Weekly routines use baseId + weekday number (1-7) since each weekday
+  /// needs its own scheduled entry.
+  static int _baseIdForRoutine(dynamic routineId) {
+    final idInt =
+        routineId is int ? routineId : int.tryParse(routineId.toString()) ?? 0;
+    return 100000 + (idInt * 10);
+  }
+
+  static Future<void> cancelRoutineNotifications(dynamic routineId) async {
+    final baseId = _baseIdForRoutine(routineId);
+    await _notifications.cancel(id: baseId);
+    for (int weekday = 1; weekday <= 7; weekday++) {
+      await _notifications.cancel(id: baseId + weekday);
+    }
+  }
+
+  static tz.TZDateTime _nextInstanceOfWeekdayTime(
+      int weekday, int hour, int minute) {
+    var scheduled = _nextInstanceOfTime(hour, minute);
+    while (scheduled.weekday != weekday) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
+  }
+
+  static tz.TZDateTime _nextInstanceOfMonthDayTime(
+      int monthDay, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled =
+        tz.TZDateTime(tz.local, now.year, now.month, monthDay, hour, minute);
+    if (scheduled.isBefore(now)) {
+      final nextMonth = now.month == 12 ? 1 : now.month + 1;
+      final nextYear = now.month == 12 ? now.year + 1 : now.year;
+      scheduled =
+          tz.TZDateTime(tz.local, nextYear, nextMonth, monthDay, hour, minute);
+    }
+    return scheduled;
+  }
+
+  /// Schedules (or re-schedules) the real device notification(s) for a
+  /// single routine, based on its repeat type. Call this any time a
+  /// routine is created, edited, deleted, or completed.
+  ///
+  /// [overrideDate] is used for 'interval' and 'once' routines to force a
+  /// specific next-occurrence date (e.g. computed from the last completion).
+  /// If omitted, the next occurrence is computed as "today or tomorrow"
+  /// based on the routine's time.
+  static Future<void> scheduleRoutineNotifications(
+    Map<String, dynamic> routine, {
+    DateTime? overrideDate,
+  }) async {
+    await cancelRoutineNotifications(routine['id']);
+
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('on_time_reminders') ?? true;
+    if (!enabled) return;
+    if (routine['is_active'] == false) return;
+
+    final timeStr = routine['time'] as String?;
+    if (timeStr == null || !timeStr.contains(':')) return;
+    final parts = timeStr.split(':');
+    final hour = int.tryParse(parts[0].trim());
+    final minute = int.tryParse(parts[1].trim());
+    if (hour == null || minute == null) return;
+
+    final title = routine['title'] ?? 'یادآوری روتین';
+    const body = 'وقت انجام این روتینه 🐾';
+    final baseId = _baseIdForRoutine(routine['id']);
+    final repeatType = routine['repeat_type'];
+
+    switch (repeatType) {
+      case 'daily':
+        await _notifications.zonedSchedule(
+          id: baseId,
+          title: title,
+          body: body,
+          scheduledDate: _nextInstanceOfTime(hour, minute),
+          notificationDetails: _defaultDetails(),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+        break;
+
+      case 'weekly':
+        final weekdayNames = List<String>.from(routine['weekdays'] ?? []);
+        const nameToNumber = {
+          'Mon': 1,
+          'Tue': 2,
+          'Wed': 3,
+          'Thu': 4,
+          'Fri': 5,
+          'Sat': 6,
+          'Sun': 7,
+        };
+        for (final name in weekdayNames) {
+          final weekdayNum = nameToNumber[name];
+          if (weekdayNum == null) continue;
+          await _notifications.zonedSchedule(
+            id: baseId + weekdayNum,
+            title: title,
+            body: body,
+            scheduledDate:
+                _nextInstanceOfWeekdayTime(weekdayNum, hour, minute),
+            notificationDetails: _defaultDetails(),
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+        }
+        break;
+
+      case 'monthly':
+        final monthDay = routine['month_day'];
+        if (monthDay == null) return;
+        await _notifications.zonedSchedule(
+          id: baseId,
+          title: title,
+          body: body,
+          scheduledDate: _nextInstanceOfMonthDayTime(monthDay, hour, minute),
+          notificationDetails: _defaultDetails(),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+        );
+        break;
+
+      case 'interval':
+      case 'once':
+        tz.TZDateTime scheduled;
+        if (overrideDate != null) {
+          scheduled = tz.TZDateTime(
+            tz.local,
+            overrideDate.year,
+            overrideDate.month,
+            overrideDate.day,
+            hour,
+            minute,
+          );
+          final now = tz.TZDateTime.now(tz.local);
+          if (scheduled.isBefore(now)) {
+            scheduled = _nextInstanceOfTime(hour, minute);
+          }
+        } else {
+          scheduled = _nextInstanceOfTime(hour, minute);
+        }
+        await _notifications.zonedSchedule(
+          id: baseId,
+          title: title,
+          body: body,
+          scheduledDate: scheduled,
+          notificationDetails: _defaultDetails(),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        break;
+    }
   }
 }

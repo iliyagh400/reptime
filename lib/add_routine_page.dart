@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 class AddRoutinePage extends StatefulWidget {
   final List<Map<String, dynamic>> pets;
@@ -47,20 +48,26 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
 
-      await Supabase.instance.client.from('routines').insert({
-        'user_id': userId,
-        'title': _titleController.text.trim(),
-        'type': _type,
-        'pet_ids': _selectedPetIds.map((e) => int.parse(e)).toList(),
-        'time': _timeController.text.trim(),
-        'repeat_type': _repeatType,
-        'weekdays':
-            _repeatType == 'weekly' ? _selectedWeekdays.toList() : null,
-        'interval_days': _repeatType == 'interval'
-            ? int.tryParse(_intervalController.text.trim())
-            : null,
-        'is_active': true,
-      });
+      final inserted = await Supabase.instance.client
+          .from('routines')
+          .insert({
+            'user_id': userId,
+            'title': _titleController.text.trim(),
+            'type': _type,
+            'pet_ids': _selectedPetIds.map((e) => int.parse(e)).toList(),
+            'time': _timeController.text.trim(),
+            'repeat_type': _repeatType,
+            'weekdays':
+                _repeatType == 'weekly' ? _selectedWeekdays.toList() : null,
+            'interval_days': _repeatType == 'interval'
+                ? int.tryParse(_intervalController.text.trim())
+                : null,
+            'is_active': true,
+          })
+          .select()
+          .single();
+
+      await NotificationService.scheduleRoutineNotifications(inserted);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

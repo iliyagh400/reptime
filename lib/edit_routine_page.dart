@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 class EditRoutinePage extends StatefulWidget {
   final Map<String, dynamic> routine;
@@ -50,18 +51,25 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.from('routines').update({
-        'title': _titleController.text.trim(),
-        'type': _type,
-        'pet_ids': _selectedPetIds.map((e) => int.parse(e)).toList(),
-        'time': _timeController.text.trim(),
-        'repeat_type': _repeatType,
-        'weekdays':
-            _repeatType == 'weekly' ? _selectedWeekdays.toList() : null,
-        'interval_days': _repeatType == 'interval'
-            ? int.tryParse(_intervalController.text.trim())
-            : null,
-      }).eq('id', widget.routine['id']);
+      final updated = await Supabase.instance.client
+          .from('routines')
+          .update({
+            'title': _titleController.text.trim(),
+            'type': _type,
+            'pet_ids': _selectedPetIds.map((e) => int.parse(e)).toList(),
+            'time': _timeController.text.trim(),
+            'repeat_type': _repeatType,
+            'weekdays':
+                _repeatType == 'weekly' ? _selectedWeekdays.toList() : null,
+            'interval_days': _repeatType == 'interval'
+                ? int.tryParse(_intervalController.text.trim())
+                : null,
+          })
+          .eq('id', widget.routine['id'])
+          .select()
+          .single();
+
+      await NotificationService.scheduleRoutineNotifications(updated);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,6 +114,9 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
           .from('routines')
           .delete()
           .eq('id', widget.routine['id']);
+
+      await NotificationService.cancelRoutineNotifications(
+          widget.routine['id']);
 
       if (mounted) Navigator.pop(context);
     } catch (e) {

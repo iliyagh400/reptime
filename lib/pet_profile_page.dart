@@ -4,6 +4,7 @@ import 'edit_pet_page.dart';
 import 'add_routine_page.dart';
 import 'edit_routine_page.dart';
 import 'routine_logic.dart';
+import 'notification_service.dart';
 
 class PetProfilePage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -72,6 +73,50 @@ class _PetProfilePageState extends State<PetProfilePage> {
       _routines = relevantToday;
       _isLoading = false;
     });
+  }
+
+  Future<void> _markDone(Map<String, dynamic> routine) async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+
+    await Supabase.instance.client.from('completions').insert({
+      'user_id': userId,
+      'routine_id': routine['id'],
+      'pet_id': widget.pet['id'],
+      'completed_at': DateTime.now().toIso8601String(),
+      'status': 'done',
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ثبت شد ✅')),
+      );
+    }
+
+    // For interval/once routines, the real notification needs to be
+    // recomputed now that a new completion exists.
+    final repeatType = routine['repeat_type'];
+    if (repeatType == 'interval' || repeatType == 'once') {
+      final completionsResponse = await Supabase.instance.client
+          .from('completions')
+          .select()
+          .eq('user_id', userId)
+          .eq('routine_id', routine['id'])
+          .eq('status', 'done');
+      final completions =
+          List<Map<String, dynamic>>.from(completionsResponse);
+
+      if (repeatType == 'once') {
+        await NotificationService.cancelRoutineNotifications(routine['id']);
+      } else {
+        final next = nextDueDate(routine, completions);
+        await NotificationService.scheduleRoutineNotifications(
+          routine,
+          overrideDate: next,
+        );
+      }
+    }
+
+    _loadRoutines();
   }
 
   String _typeLabel(String type) {
@@ -342,37 +387,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
                                                     .check_circle_outline),
                                                 color: const Color(
                                                     0xFF3F5D45),
-                                                onPressed: () async {
-                                                  final userId = Supabase
-                                                      .instance
-                                                      .client
-                                                      .auth
-                                                      .currentUser!
-                                                      .id;
-                                                  await Supabase
-                                                      .instance.client
-                                                      .from('completions')
-                                                      .insert({
-                                                    'user_id': userId,
-                                                    'routine_id': r['id'],
-                                                    'pet_id':
-                                                        widget.pet['id'],
-                                                    'completed_at':
-                                                        DateTime.now()
-                                                            .toIso8601String(),
-                                                    'status': 'done',
-                                                  });
-                                                  if (context.mounted) {
-                                                    ScaffoldMessenger.of(
-                                                            context)
-                                                        .showSnackBar(
-                                                      const SnackBar(
-                                                          content: Text(
-                                                              'ثبت شد ✅')),
-                                                    );
-                                                  }
-                                                  _loadRoutines();
-                                                },
+                                                onPressed: () =>
+                                                    _markDone(r),
                                               ),
                                       ],
                                     ),
