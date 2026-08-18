@@ -117,6 +117,9 @@ class NotificationService {
     for (int weekday = 1; weekday <= 7; weekday++) {
       await _notifications.cancel(id: baseId + weekday);
     }
+    for (int k = 1; k <= 8; k++) {
+      await _notifications.cancel(id: baseId + 50 + k);
+    }
   }
 
   static tz.TZDateTime _nextInstanceOfWeekdayTime(
@@ -279,5 +282,63 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
+  }
+
+  // ---------- overdue reminders (one-shot, refreshed each app launch) ----------
+
+  static const int _maxOverdueReminders = 8;
+
+  static Future<void> cancelOverdueReminders(dynamic routineId) async {
+    final baseId = _baseIdForRoutine(routineId);
+    for (int k = 1; k <= _maxOverdueReminders; k++) {
+      await _notifications.cancel(id: baseId + 50 + k);
+    }
+  }
+
+  /// Schedules today's remaining overdue reminders for a list of routines
+  /// that are due today but not yet completed. Call this whenever the app
+  /// starts or the home screen data refreshes. Each reminder is a one-shot
+  /// notification (not repeating) so it naturally stops once the day ends;
+  /// call [cancelOverdueReminders] when the routine gets marked done.
+  static Future<void> refreshOverdueReminders(
+      List<Map<String, dynamic>> dueUncompletedRoutines) async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('overdue_reminders') ?? true;
+    final intervalHours = prefs.getInt('overdue_interval_hours') ?? 1;
+
+    for (final routine in dueUncompletedRoutines) {
+      await cancelOverdueReminders(routine['id']);
+      if (!enabled) continue;
+
+      final timeStr = routine['time'] as String?;
+      if (timeStr == null || !timeStr.contains(':')) continue;
+      final parts = timeStr.split(':');
+      final hour = int.tryParse(parts[0].trim());
+      final minute = int.tryParse(parts[1].trim());
+      if (hour == null || minute == null) continue;
+
+      final baseId = _baseIdForRoutine(routine['id']);
+      final title = routine['title'] ?? 'یادآور';
+      final now = tz.TZDateTime.now(tz.local);
+      var next =
+          tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+
+      int k = 1;
+      while (k <= _maxOverdueReminders) {
+        next = next.add(Duration(hours: intervalHours));
+        if (next.day != now.day) break;
+        if (next.isAfter(now)) {
+          await _notifications.zonedSchedule(
+            id: baseId + 50 + k,
+            title: title,
+            body: 'هنوز این کار امروز انجام نشده ⏰',
+            scheduledDate: next,
+            notificationDetails: _defaultDetails(),
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          );
+        }
+        k++;
+      }
+    }
   }
 }

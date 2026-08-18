@@ -80,43 +80,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<Map<String, int>> _overallTodayStatus() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
+  final userId = Supabase.instance.client.auth.currentUser!.id;
 
-    final routinesResponse = await Supabase.instance.client
-        .from('routines')
-        .select()
-        .eq('user_id', userId)
-        .eq('is_active', true);
+  final routinesResponse = await Supabase.instance.client
+      .from('routines')
+      .select()
+      .eq('user_id', userId)
+      .eq('is_active', true);
 
-    final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
+  final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
 
-    final completionsResponse = await Supabase.instance.client
-        .from('completions')
-        .select()
-        .eq('user_id', userId)
-        .eq('status', 'done');
+  final completionsResponse = await Supabase.instance.client
+      .from('completions')
+      .select()
+      .eq('user_id', userId)
+      .eq('status', 'done');
 
-    final allCompletions = List<Map<String, dynamic>>.from(completionsResponse);
+  final allCompletions = List<Map<String, dynamic>>.from(completionsResponse);
 
-    int total = 0;
-    int done = 0;
+  int total = 0;
+  int done = 0;
+  final List<Map<String, dynamic>> dueUncompleted = [];
 
-    for (final routine in allRoutines) {
-      final petIds = List.from(routine['pet_ids'] ?? []);
-      for (final petId in petIds) {
-        final petCompletions =
-            allCompletions.where((c) => c['pet_id'] == petId).toList();
-        if (isRelevantToday(routine, petCompletions)) {
-          total++;
-          if (isDoneToday(routine, petCompletions)) {
-            done++;
-          }
+  for (final routine in allRoutines) {
+    final petIds = List.from(routine['pet_ids'] ?? []);
+    bool anyPetDueUncompleted = false;
+    for (final petId in petIds) {
+      final petCompletions =
+          allCompletions.where((c) => c['pet_id'] == petId).toList();
+      if (isRelevantToday(routine, petCompletions)) {
+        total++;
+        if (isDoneToday(routine, petCompletions)) {
+          done++;
+        } else {
+          anyPetDueUncompleted = true;
         }
       }
     }
-
-    return {'total': total, 'done': done};
+    if (anyPetDueUncompleted) {
+      dueUncompleted.add(routine);
+    }
   }
+
+  await NotificationService.refreshOverdueReminders(dueUncompleted);
+
+  return {'total': total, 'done': done};
+}
 
   @override
   Widget build(BuildContext context) {
