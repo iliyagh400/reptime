@@ -49,12 +49,13 @@ class _PetProfilePageState extends State<PetProfilePage> {
       return ids.contains(petId);
     }).toList();
 
+    // Fetch both 'done' and 'skipped' responses — status filter removed
+    // on purpose so isDoneToday / isSkippedToday can tell them apart.
     final completionsResponse = await Supabase.instance.client
         .from('completions')
         .select()
         .eq('user_id', userId)
-        .eq('pet_id', petId)
-        .eq('status', 'done');
+        .eq('pet_id', petId);
 
     final completions = List<Map<String, dynamic>>.from(completionsResponse);
 
@@ -65,6 +66,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
         relevantToday.add({
           ...routine,
           'isDoneToday': isDoneToday(routine, completions),
+          'isSkippedToday': isSkippedToday(routine, completions),
         });
       }
     }
@@ -75,7 +77,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
     });
   }
 
-  Future<void> _markDone(Map<String, dynamic> routine) async {
+  Future<void> _respond(Map<String, dynamic> routine, String status,
+      {String? note}) async {
     final userId = Supabase.instance.client.auth.currentUser!.id;
 
     await Supabase.instance.client.from('completions').insert({
@@ -83,25 +86,29 @@ class _PetProfilePageState extends State<PetProfilePage> {
       'routine_id': routine['id'],
       'pet_id': widget.pet['id'],
       'completed_at': DateTime.now().toIso8601String(),
-      'status': 'done',
+      'status': status,
+      'note': note,
     });
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ثبت شد ✅')),
+        SnackBar(
+          content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
+        ),
       );
     }
 
+    await NotificationService.cancelOverdueReminders(routine['id']);
+
     // For interval/once routines, the real notification needs to be
-    // recomputed now that a new completion exists.
+    // recomputed now that a new response (done or skipped) exists.
     final repeatType = routine['repeat_type'];
     if (repeatType == 'interval' || repeatType == 'once') {
       final completionsResponse = await Supabase.instance.client
           .from('completions')
           .select()
           .eq('user_id', userId)
-          .eq('routine_id', routine['id'])
-          .eq('status', 'done');
+          .eq('routine_id', routine['id']);
       final completions =
           List<Map<String, dynamic>>.from(completionsResponse);
 
@@ -109,14 +116,61 @@ class _PetProfilePageState extends State<PetProfilePage> {
         await NotificationService.cancelRoutineNotifications(routine['id']);
       } else {
         final next = nextDueDate(routine, completions);
+        final petIds = List.from(routine['pet_ids'] ?? []);
+        final petNames = _allPets
+            .where((p) => petIds.contains(p['id']))
+            .map((p) => p['name'] as String)
+            .toList();
         await NotificationService.scheduleRoutineNotifications(
           routine,
           overrideDate: next,
+          petNames: petNames,
         );
       }
     }
 
     _loadRoutines();
+  }
+
+  Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
+    final noteController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('رد کردن این بار'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('چرا این بار انجامش نمی‌دی؟ (اختیاری)'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'مثلاً: این هفته در حال پوست‌اندازیه',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('رد کن'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final note = noteController.text.trim();
+      await _respond(routine, 'skipped', note: note.isEmpty ? null : note);
+    }
   }
 
   String _typeLabel(String type) {
@@ -162,7 +216,9 @@ class _PetProfilePageState extends State<PetProfilePage> {
   Widget build(BuildContext context) {
     final doneCount =
         _routines.where((r) => r['isDoneToday'] == true).length;
-    final totalCount = _routines.length;
+    final totalCount = _routines
+        .where((r) => r['isSkippedToday'] != true)
+        .length;
 
     return Scaffold(
       appBar: AppBar(
@@ -289,6 +345,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
                           itemBuilder: (context, index) {
                             final r = _routines[index];
                             final doneToday = r['isDoneToday'] == true;
+                            final skippedToday = r['isSkippedToday'] == true;
                             final type = r['type'] ?? 'other';
 
                             return Container(
@@ -345,6 +402,15 @@ class _PetProfilePageState extends State<PetProfilePage> {
                                                     color: Colors.green,
                                                     size: 16),
                                               ),
+                                            if (skippedToday)
+                                              const Positioned(
+                                                right: -2,
+                                                bottom: -2,
+                                                child: Icon(
+                                                    Icons.cancel,
+                                                    color: Colors.grey,
+                                                    size: 16),
+                                              ),
                                           ],
                                         ),
                                         const SizedBox(width: 12),
@@ -359,18 +425,22 @@ class _PetProfilePageState extends State<PetProfilePage> {
                                                   fontSize: 15,
                                                   fontWeight:
                                                       FontWeight.w600,
-                                                  decoration: doneToday
+                                                  decoration: (doneToday ||
+                                                          skippedToday)
                                                       ? TextDecoration
                                                           .lineThrough
                                                       : null,
-                                                  color: doneToday
+                                                  color: (doneToday ||
+                                                          skippedToday)
                                                       ? Colors.grey
                                                       : Colors.black87,
                                                 ),
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                '${_typeLabel(type)} · ${r['time'] ?? ''}',
+                                                skippedToday
+                                                    ? '${_typeLabel(type)} · رد شد'
+                                                    : '${_typeLabel(type)} · ${r['time'] ?? ''}',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
@@ -379,17 +449,34 @@ class _PetProfilePageState extends State<PetProfilePage> {
                                             ],
                                           ),
                                         ),
-                                        doneToday
-                                            ? const Icon(Icons.check_circle,
-                                                color: Colors.green)
-                                            : IconButton(
+                                        if (doneToday)
+                                          const Icon(Icons.check_circle,
+                                              color: Colors.green)
+                                        else if (skippedToday)
+                                          const Icon(Icons.cancel,
+                                              color: Colors.grey)
+                                        else
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(
+                                                    Icons.close),
+                                                color: Colors.grey[500],
+                                                tooltip: 'رد کردن این بار',
+                                                onPressed: () =>
+                                                    _showSkipDialog(r),
+                                              ),
+                                              IconButton(
                                                 icon: const Icon(Icons
                                                     .check_circle_outline),
                                                 color: const Color(
                                                     0xFF3F5D45),
                                                 onPressed: () =>
-                                                    _markDone(r),
+                                                    _respond(r, 'done'),
                                               ),
+                                            ],
+                                          ),
                                       ],
                                     ),
                                   ),

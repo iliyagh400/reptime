@@ -55,12 +55,14 @@ class _HomePageState extends State<HomePage> {
       return ids.contains(petId);
     }).toList();
 
+    // No status filter here on purpose — both 'done' and 'skipped'
+    // responses are needed so isDoneToday/isSkippedToday can tell them
+    // apart (skipped tasks are excluded from the total/done fraction).
     final completionsResponse = await Supabase.instance.client
         .from('completions')
         .select()
         .eq('user_id', userId)
-        .eq('pet_id', petId)
-        .eq('status', 'done');
+        .eq('pet_id', petId);
 
     final completions = List<Map<String, dynamic>>.from(completionsResponse);
 
@@ -69,6 +71,7 @@ class _HomePageState extends State<HomePage> {
 
     for (final routine in petRoutines) {
       if (isRelevantToday(routine, completions)) {
+        if (isSkippedToday(routine, completions)) continue;
         total++;
         if (isDoneToday(routine, completions)) {
           done++;
@@ -80,52 +83,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<Map<String, int>> _overallTodayStatus() async {
-  final userId = Supabase.instance.client.auth.currentUser!.id;
+    final userId = Supabase.instance.client.auth.currentUser!.id;
 
-  final routinesResponse = await Supabase.instance.client
-      .from('routines')
-      .select()
-      .eq('user_id', userId)
-      .eq('is_active', true);
+    final routinesResponse = await Supabase.instance.client
+        .from('routines')
+        .select()
+        .eq('user_id', userId)
+        .eq('is_active', true);
 
-  final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
+    final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
 
-  final completionsResponse = await Supabase.instance.client
-      .from('completions')
-      .select()
-      .eq('user_id', userId)
-      .eq('status', 'done');
+    final completionsResponse = await Supabase.instance.client
+        .from('completions')
+        .select()
+        .eq('user_id', userId);
 
-  final allCompletions = List<Map<String, dynamic>>.from(completionsResponse);
+    final allCompletions = List<Map<String, dynamic>>.from(completionsResponse);
 
-  int total = 0;
-  int done = 0;
-  final List<Map<String, dynamic>> dueUncompleted = [];
+    int total = 0;
+    int done = 0;
+    final List<Map<String, dynamic>> dueUncompleted = [];
 
-  for (final routine in allRoutines) {
-    final petIds = List.from(routine['pet_ids'] ?? []);
-    bool anyPetDueUncompleted = false;
-    for (final petId in petIds) {
-      final petCompletions =
-          allCompletions.where((c) => c['pet_id'] == petId).toList();
-      if (isRelevantToday(routine, petCompletions)) {
-        total++;
-        if (isDoneToday(routine, petCompletions)) {
-          done++;
-        } else {
-          anyPetDueUncompleted = true;
+    for (final routine in allRoutines) {
+      final petIds = List.from(routine['pet_ids'] ?? []);
+      bool anyPetDueUncompleted = false;
+      for (final petId in petIds) {
+        final petCompletions =
+            allCompletions.where((c) => c['pet_id'] == petId).toList();
+        if (isSkippedToday(routine, petCompletions)) continue;
+        if (isRelevantToday(routine, petCompletions)) {
+          total++;
+          if (isDoneToday(routine, petCompletions)) {
+            done++;
+          } else {
+            anyPetDueUncompleted = true;
+          }
         }
       }
+      if (anyPetDueUncompleted) {
+        dueUncompleted.add(routine);
+      }
     }
-    if (anyPetDueUncompleted) {
-      dueUncompleted.add(routine);
-    }
+
+    await NotificationService.refreshOverdueReminders(dueUncompleted);
+
+    return {'total': total, 'done': done};
   }
-
-  await NotificationService.refreshOverdueReminders(dueUncompleted);
-
-  return {'total': total, 'done': done};
-}
 
   @override
   Widget build(BuildContext context) {
@@ -227,17 +230,30 @@ class _HomePageState extends State<HomePage> {
                             color: const Color(0xFF3F5D45),
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: Text(
-                            total == 0
-                                ? 'امروز کاری ثبت نشده'
-                                : remaining == 0
-                                    ? 'همه‌ی کارهای امروز انجام شد 🎉'
-                                    : 'امروز $remaining کار مونده از $total کار',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'تعداد کارهای امروز: $total',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                total == 0
+                                    ? 'کاری ثبت نشده'
+                                    : remaining == 0
+                                        ? 'همه‌ی کارها انجام شد 🎉'
+                                        : '$remaining تا مونده',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.85),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },

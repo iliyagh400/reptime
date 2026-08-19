@@ -1,4 +1,4 @@
-DateTime? lastCompletionDate(
+Map<String, dynamic>? _lastResponseRecord(
     List<Map<String, dynamic>> completions, dynamic routineId) {
   final matches =
       completions.where((c) => c['routine_id'] == routineId).toList();
@@ -7,23 +7,54 @@ DateTime? lastCompletionDate(
   matches.sort((a, b) => DateTime.parse(b['completed_at'])
       .compareTo(DateTime.parse(a['completed_at'])));
 
-  return DateTime.parse(matches.first['completed_at']);
+  return matches.first;
+}
+
+/// Date of the most recent response (done OR skipped) for this routine.
+/// Used to compute the next occurrence for interval-based routines, since
+/// skipping an interval routine should push its next reminder forward
+/// just like completing it does.
+DateTime? lastCompletionDate(
+    List<Map<String, dynamic>> completions, dynamic routineId) {
+  final record = _lastResponseRecord(completions, routineId);
+  if (record == null) return null;
+  return DateTime.parse(record['completed_at']);
+}
+
+bool _isRecordToday(Map<String, dynamic>? record, String status) {
+  if (record == null) return false;
+  if (record['status'] != status) return false;
+  final date = DateTime.parse(record['completed_at']);
+  final now = DateTime.now();
+  return date.year == now.year &&
+      date.month == now.month &&
+      date.day == now.day;
 }
 
 bool isDoneToday(
     Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final lastDone = lastCompletionDate(completions, routine['id']);
-  if (lastDone == null) return false;
+  final record = _lastResponseRecord(completions, routine['id']);
+  return _isRecordToday(record, 'done');
+}
 
-  final lastDoneDay = DateTime(lastDone.year, lastDone.month, lastDone.day);
-  return lastDoneDay.isAtSameMomentAs(today);
+bool isSkippedToday(
+    Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
+  final record = _lastResponseRecord(completions, routine['id']);
+  return _isRecordToday(record, 'skipped');
+}
+
+/// True if the routine already got a response today, either done or
+/// skipped. Once handled, it should stop showing as "due" and stop
+/// triggering overdue reminders for the rest of the day.
+bool isHandledToday(
+    Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
+  return isDoneToday(routine, completions) ||
+      isSkippedToday(routine, completions);
 }
 
 bool isDueToday(
     Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
-  if (isDoneToday(routine, completions)) return false;
+  if (isHandledToday(routine, completions)) return false;
 
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -74,9 +105,13 @@ bool isDueToday(
   }
 }
 
+/// Whether a routine should show up in "today's tasks" at all: either it's
+/// currently due, or it already got a response (done/skipped) today so the
+/// user can see the outcome.
 bool isRelevantToday(
     Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
-  return isDueToday(routine, completions) || isDoneToday(routine, completions);
+  return isDueToday(routine, completions) ||
+      isHandledToday(routine, completions);
 }
 
 /// Converts a short weekday name ('Mon', 'Tue', ...) back into Dart's
@@ -97,7 +132,7 @@ int? weekdayNumberFromShortName(String name) {
 
 /// Computes the next date (date only, no time) this routine is due,
 /// based on its repeat type. Used to schedule the *next* real
-/// notification after a routine is created, edited, or completed.
+/// notification after a routine is created, edited, completed, or skipped.
 DateTime? nextDueDate(
     Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
   final now = DateTime.now();
