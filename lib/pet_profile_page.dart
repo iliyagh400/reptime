@@ -5,6 +5,8 @@ import 'add_routine_page.dart';
 import 'edit_routine_page.dart';
 import 'routine_logic.dart';
 import 'notification_service.dart';
+import 'pet_history_page.dart';
+import 'add_event_page.dart';
 
 class PetProfilePage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -224,6 +226,30 @@ class _PetProfilePageState extends State<PetProfilePage> {
       appBar: AppBar(
         title: Text(widget.pet['name'] ?? ''),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'تاریخچه',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PetHistoryPage(pet: widget.pet),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.note_add_outlined),
+            tooltip: 'ثبت اتفاق جدید',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddEventPage(pet: widget.pet),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
