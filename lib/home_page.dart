@@ -7,6 +7,7 @@ import 'notification_service.dart';
 import 'settings_page.dart';
 import 'routine_logic.dart';
 import 'login_page.dart';
+import 'species_data.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -128,6 +129,24 @@ class _HomePageState extends State<HomePage> {
     await NotificationService.refreshOverdueReminders(dueUncompleted);
 
     return {'total': total, 'done': done};
+  }
+
+  Widget _buildPetIcon(Map<String, dynamic> pet, {required double size}) {
+    final imagePath = imagePathForBreed(pet['breed']);
+    final fallback = Center(
+      child: Text(
+        emojiForSpeciesGroup(pet['species_group']),
+        style: TextStyle(fontSize: size * 0.46),
+      ),
+    );
+    if (imagePath == null) return fallback;
+    return Image.asset(
+      imagePath,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => fallback,
+    );
   }
 
   @override
@@ -306,10 +325,8 @@ class _HomePageState extends State<HomePage> {
                                             child: ClipRRect(
                                               borderRadius:
                                                   BorderRadius.circular(14),
-                                              child: Image.asset(
-                                                'assets/icons/ballpic.png',
-                                                fit: BoxFit.cover,
-                                              ),
+                                              child: _buildPetIcon(pet,
+                                                  size: 56),
                                             ),
                                           ),
                                           const SizedBox(width: 14),

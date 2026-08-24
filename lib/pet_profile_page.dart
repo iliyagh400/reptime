@@ -7,6 +7,7 @@ import 'routine_logic.dart';
 import 'notification_service.dart';
 import 'pet_history_page.dart';
 import 'add_event_page.dart';
+import 'species_data.dart';
 
 class PetProfilePage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -214,6 +215,24 @@ class _PetProfilePageState extends State<PetProfilePage> {
     }
   }
 
+  Widget _buildPetIcon(Map<String, dynamic> pet, {required double size}) {
+    final imagePath = imagePathForBreed(pet['breed']);
+    final fallback = Center(
+      child: Text(
+        emojiForSpeciesGroup(pet['species_group']),
+        style: TextStyle(fontSize: size * 0.46),
+      ),
+    );
+    if (imagePath == null) return fallback;
+    return Image.asset(
+      imagePath,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => fallback,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final doneCount =
@@ -288,10 +307,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: Image.asset(
-                            'assets/icons/ballpic.png',
-                            fit: BoxFit.cover,
-                          ),
+                          child: _buildPetIcon(widget.pet, size: 64),
                         ),
                       ),
                       const SizedBox(width: 14),

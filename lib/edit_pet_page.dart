@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'species_data.dart';
+import 'species_picker_page.dart';
 
 class EditPetPage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -11,24 +13,73 @@ class EditPetPage extends StatefulWidget {
 
 class _EditPetPageState extends State<EditPetPage> {
   late final TextEditingController _nameController;
-  late final TextEditingController _speciesGroupController;
+  late final TextEditingController _customSpeciesGroupController;
   late final TextEditingController _breedController;
   late final TextEditingController _genderController;
   late final TextEditingController _ageController;
   late final TextEditingController _weightController;
   bool _isLoading = false;
 
+  String? _selectedCategory;
+  String? _selectedCategoryEmoji;
+  bool _isCustomSpecies = false;
+
+  String get _finalSpeciesGroup {
+    if (_isCustomSpecies) return _customSpeciesGroupController.text.trim();
+    return _selectedCategory ?? '';
+  }
+
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.pet['name']);
-    _speciesGroupController =
-        TextEditingController(text: widget.pet['species_group']);
     _breedController = TextEditingController(text: widget.pet['breed']);
     _genderController = TextEditingController(text: widget.pet['gender']);
     _ageController = TextEditingController(text: widget.pet['age']);
     _weightController =
         TextEditingController(text: widget.pet['weight']?.toString() ?? '');
+
+    final currentGroup = widget.pet['species_group'] as String?;
+    final matchesKnown =
+        speciesCategories.any((c) => c.name == currentGroup);
+    if (currentGroup != null && currentGroup.isNotEmpty && matchesKnown) {
+      _selectedCategory = currentGroup;
+      _selectedCategoryEmoji = emojiForSpeciesGroup(currentGroup);
+      _isCustomSpecies = false;
+      _customSpeciesGroupController = TextEditingController();
+    } else if (currentGroup != null && currentGroup.isNotEmpty) {
+      _isCustomSpecies = true;
+      _customSpeciesGroupController =
+          TextEditingController(text: currentGroup);
+    } else {
+      _customSpeciesGroupController = TextEditingController();
+    }
+  }
+
+  Future<void> _openPicker() async {
+    final result = await Navigator.push<SpeciesPickResult>(
+      context,
+      MaterialPageRoute(builder: (context) => const SpeciesPickerPage()),
+    );
+    if (result == null) return;
+
+    setState(() {
+      if (result.isCustom && result.categoryName.isEmpty) {
+        _isCustomSpecies = true;
+        _selectedCategory = null;
+        _selectedCategoryEmoji = null;
+      } else if (result.isCustom) {
+        _isCustomSpecies = false;
+        _selectedCategory = result.categoryName;
+        _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
+        _breedController.clear();
+      } else {
+        _isCustomSpecies = false;
+        _selectedCategory = result.categoryName;
+        _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
+        _breedController.text = result.speciesName;
+      }
+    });
   }
 
   Future<void> _updatePet() async {
@@ -36,7 +87,7 @@ class _EditPetPageState extends State<EditPetPage> {
     try {
       await Supabase.instance.client.from('pets').update({
         'name': _nameController.text.trim(),
-        'species_group': _speciesGroupController.text.trim(),
+        'species_group': _finalSpeciesGroup,
         'breed': _breedController.text.trim(),
         'gender': _genderController.text.trim(),
         'age': _ageController.text.trim(),
@@ -139,11 +190,12 @@ class _EditPetPageState extends State<EditPetPage> {
                   color: const Color(0xFFE3B679),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Image.asset(
-                    'assets/icons/ballpic.png',
-                    fit: BoxFit.cover,
+                child: Center(
+                  child: Text(
+                    _isCustomSpecies
+                        ? '✏️'
+                        : (_selectedCategoryEmoji ?? defaultSpeciesEmoji),
+                    style: const TextStyle(fontSize: 30),
                   ),
                 ),
               ),
@@ -153,11 +205,48 @@ class _EditPetPageState extends State<EditPetPage> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'اسم'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _speciesGroupController,
-              decoration: const InputDecoration(labelText: 'نوع/گروه'),
+            _sectionLabel('نوع/گونه'),
+            InkWell(
+              onTap: _openPicker,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE4E8D9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      _isCustomSpecies
+                          ? '✏️'
+                          : (_selectedCategoryEmoji ?? '🔍'),
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _isCustomSpecies
+                            ? otherSpeciesLabel
+                            : (_selectedCategory ?? 'انتخاب نوع/گونه'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_left, color: Colors.grey),
+                  ],
+                ),
+              ),
             ),
+            if (_isCustomSpecies) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _customSpeciesGroupController,
+                decoration:
+                    const InputDecoration(labelText: 'نوع/گروه را بنویس'),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _breedController,
