@@ -158,23 +158,6 @@ class _HomePageState extends State<HomePage> {
         title: const Text('REPTIME'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () async {
-              final now = DateTime.now().add(const Duration(minutes: 1));
-              try {
-                await NotificationService.scheduleDailyNotification(
-                  id: 999,
-                  title: 'تست زمان‌بندی',
-                  body: 'این باید یک دقیقه دیگه بیاد ✅',
-                  hour: now.hour,
-                  minute: now.minute,
-                );
-              } catch (e) {
-                // ignore
-              }
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.alarm_add),
             onPressed: _pets.isEmpty
                 ? null
@@ -358,7 +341,7 @@ class _HomePageState extends State<HomePage> {
                                             builder: (context) =>
                                                 PetProfilePage(pet: pet)),
                                       );
-                                      setState(() {});
+                                      _loadPets();
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.all(14),

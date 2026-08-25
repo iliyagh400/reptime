@@ -8,6 +8,7 @@ import 'notification_service.dart';
 import 'pet_history_page.dart';
 import 'add_event_page.dart';
 import 'species_data.dart';
+import 'add_checkin_page.dart';
 
 class PetProfilePage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -20,12 +21,14 @@ class PetProfilePage extends StatefulWidget {
 class _PetProfilePageState extends State<PetProfilePage> {
   List<Map<String, dynamic>> _routines = [];
   List<Map<String, dynamic>> _allPets = [];
+  Map<String, dynamic>? _latestCheckin;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadRoutines();
+    _loadLatestCheckin();
   }
 
   Future<void> _loadRoutines() async {
@@ -78,6 +81,41 @@ class _PetProfilePageState extends State<PetProfilePage> {
       _routines = relevantToday;
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadLatestCheckin() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+
+    final response = await Supabase.instance.client
+        .from('pet_checkins')
+        .select()
+        .eq('user_id', userId)
+        .eq('pet_id', widget.pet['id'])
+        .order('checkin_date', ascending: false)
+        .limit(1);
+
+    final results = List<Map<String, dynamic>>.from(response);
+    setState(() {
+      _latestCheckin = results.isEmpty ? null : results.first;
+    });
+  }
+
+  bool get _checkinIsOverdue {
+    if (_latestCheckin == null) return true;
+    final lastDate = DateTime.parse(_latestCheckin!['checkin_date']);
+    return DateTime.now().difference(lastDate).inDays >= 30;
+  }
+
+  Future<void> _openCheckinForm() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddCheckinPage(pet: widget.pet),
+      ),
+    );
+    if (saved == true) {
+      _loadLatestCheckin();
+    }
   }
 
   Future<void> _respond(Map<String, dynamic> routine, String status,
@@ -354,6 +392,66 @@ class _PetProfilePageState extends State<PetProfilePage> {
                                   ),
                                 ),
                         ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _checkinIsOverdue
+                        ? const Color(0xFFF5E3C8)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: _checkinIsOverdue
+                          ? const Color(0xFFC98A3E)
+                          : const Color(0xFFC9D0BA),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _checkinIsOverdue
+                                  ? 'وقتشه اطلاعات رو به‌روز کنی'
+                                  : 'آخرین بروزرسانی',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _checkinIsOverdue
+                                    ? const Color(0xFF8A5A16)
+                                    : Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            if (_latestCheckin != null)
+                              Text(
+                                'وزن: ${_latestCheckin!['weight'] ?? '—'} گرم · سلامت: ${_latestCheckin!['health_score'] ?? '—'}/10',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              )
+                            else
+                              Text(
+                                'هنوز هیچ اطلاعاتی ثبت نشده',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _openCheckinForm,
+                        child: const Text('ثبت جدید'),
+                      ),
                     ],
                   ),
                 ),
