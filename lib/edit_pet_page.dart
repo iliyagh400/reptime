@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'species_data.dart';
 import 'species_picker_page.dart';
+import 'notification_service.dart';
 
 class EditPetPage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -133,10 +134,51 @@ class _EditPetPageState extends State<EditPetPage> {
     if (confirm != true) return;
 
     try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final petId = widget.pet['id'];
+
+      // Remove this pet from every routine's pet_ids. If a routine ends
+      // up with no pets left, delete the routine entirely (and its
+      // scheduled notifications) instead of leaving an empty one behind.
+      final routinesResponse = await Supabase.instance.client
+          .from('routines')
+          .select()
+          .eq('user_id', userId);
+      final routines = List<Map<String, dynamic>>.from(routinesResponse);
+
+      for (final routine in routines) {
+        final petIds = List.from(routine['pet_ids'] ?? []);
+        if (!petIds.contains(petId)) continue;
+
+        petIds.remove(petId);
+        if (petIds.isEmpty) {
+          await Supabase.instance.client
+              .from('routines')
+              .delete()
+              .eq('id', routine['id']);
+          await NotificationService.cancelRoutineNotifications(
+              routine['id']);
+        } else {
+          await Supabase.instance.client
+              .from('routines')
+              .update({'pet_ids': petIds}).eq('id', routine['id']);
+        }
+      }
+
+      // Remove this pet's history so it doesn't linger in stats/timelines.
+      await Supabase.instance.client
+          .from('completions')
+          .delete()
+          .eq('pet_id', petId);
+      await Supabase.instance.client
+          .from('pet_events')
+          .delete()
+          .eq('pet_id', petId);
+
       await Supabase.instance.client
           .from('pets')
           .delete()
-          .eq('id', widget.pet['id']);
+          .eq('id', petId);
 
       if (mounted) {
         Navigator.pop(context);

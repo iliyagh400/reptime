@@ -19,6 +19,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _pets = [];
   bool _isLoading = true;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -277,11 +279,59 @@ class _HomePageState extends State<HomePage> {
                         );
                       },
                     ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value),
+                        decoration: InputDecoration(
+                          hintText: 'جستجوی اسم حیوون...',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFC9D0BA)),
+                          ),
+                          suffixIcon: _searchQuery.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                ),
+                        ),
+                      ),
+                    ),
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: _pets.length,
+                      child: Builder(builder: (context) {
+                        final filteredPets = _searchQuery.trim().isEmpty
+                            ? _pets
+                            : _pets.where((pet) {
+                                final name =
+                                    (pet['name'] ?? '').toString();
+                                return name.contains(_searchQuery.trim());
+                              }).toList();
+
+                        if (filteredPets.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'حیوونی با این اسم پیدا نشد',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                        itemCount: filteredPets.length,
                         itemBuilder: (context, index) {
-                          final pet = _pets[index];
+                          final pet = filteredPets[index];
                           return FutureBuilder<Map<String, int>>(
                             future: _todayTaskStatus(pet['id']),
                             builder: (context, snapshot) {
@@ -396,7 +446,8 @@ class _HomePageState extends State<HomePage> {
                             },
                           );
                         },
-                      ),
+                      );
+                      }),
                     ),
                   ],
                 ),
