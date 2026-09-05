@@ -3,23 +3,44 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   static final _notifications = FlutterLocalNotificationsPlugin();
-
+  static bool _initialized = false;
+  static bool get isInitialized => _initialized;
   static Future<void> init() async {
-    tz_data.initializeTimeZones();
-    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
+    try {
+      tz_data.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(
+        tz.getLocation(timezoneInfo.identifier),
+      );
 
-    await _notifications.initialize(settings: initSettings);
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    final androidImpl = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await androidImpl?.requestNotificationsPermission();
-    await androidImpl?.requestExactAlarmsPermission();
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+      );
+
+      await _notifications.initialize(
+        settings: initSettings,
+      );
+
+      final androidImpl =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidImpl?.requestNotificationsPermission();
+      await androidImpl?.requestExactAlarmsPermission();
+
+      _initialized = true;
+    } catch (e) {
+      _initialized = false;
+      // debugPrint('NotificationService init error: $e');
+    }
   }
 
   static NotificationDetails _defaultDetails() {
@@ -87,7 +108,13 @@ class NotificationService {
   }
 
   static Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id: id);
+    if (!_initialized) return;
+
+    try {
+      await _notifications.cancel(id: id);
+    } catch (e) {
+      // debugPrint('Cancel notification error: $e');
+    }
   }
 
   static Future<void> showInstantNotification() async {
@@ -111,17 +138,31 @@ class NotificationService {
     return 100000 + (idInt * 10);
   }
 
-  static Future<void> cancelRoutineNotifications(dynamic routineId) async {
-    final baseId = _baseIdForRoutine(routineId);
-    await _notifications.cancel(id: baseId);
-    for (int weekday = 1; weekday <= 7; weekday++) {
-      await _notifications.cancel(id: baseId + weekday);
-    }
-    for (int k = 1; k <= 8; k++) {
-      await _notifications.cancel(id: baseId + 50 + k);
+ static Future<void> cancelRoutineNotifications(dynamic routineId) async {
+    if (!_initialized) return;
+
+    try {
+      final baseId = _baseIdForRoutine(routineId);
+
+      await _notifications.cancel(id: baseId);
+
+      for (int weekday = 1; weekday <= 7; weekday++) {
+        await _notifications.cancel(
+          id: baseId + weekday,
+        );
+      }
+
+      for (int k = 1; k <= 8; k++) {
+        await _notifications.cancel(
+          id: baseId + 50 + k,
+        );
+      }
+    } catch (e) {
+      // debugPrint(
+      //   'Cancel routine notifications error: $e',
+      // );
     }
   }
-
   static tz.TZDateTime _nextInstanceOfWeekdayTime(
       int weekday, int hour, int minute) {
     var scheduled = _nextInstanceOfTime(hour, minute);
@@ -289,9 +330,20 @@ class NotificationService {
   static const int _maxOverdueReminders = 8;
 
   static Future<void> cancelOverdueReminders(dynamic routineId) async {
-    final baseId = _baseIdForRoutine(routineId);
-    for (int k = 1; k <= _maxOverdueReminders; k++) {
-      await _notifications.cancel(id: baseId + 50 + k);
+    if (!_initialized) return;
+
+    try {
+      final baseId = _baseIdForRoutine(routineId);
+
+      for (int k = 1; k <= _maxOverdueReminders; k++) {
+        await _notifications.cancel(
+          id: baseId + 50 + k,
+        );
+      }
+    } catch (e) {
+      debugPrint(
+        'Cancel overdue notifications error: $e',
+      );
     }
   }
 

@@ -10,6 +10,8 @@ import 'routine_logic.dart';
 import 'login_page.dart';
 import 'species_data.dart';
 import 'animated_entry.dart';
+import 'today_task_page.dart';
+
 
 /// Premium redesigned HomePage.
 ///
@@ -463,13 +465,26 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTodayHero() {
-    return FutureBuilder<Map<String, int>>(
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const TodayTasksPage(),
+        ),
+      );
+    },
+    child: FutureBuilder<Map<String, int>>(
       future: _overallTodayStatus(),
       builder: (context, snapshot) {
         final total = snapshot.data?['total'] ?? 0;
         final done = snapshot.data?['done'] ?? 0;
+
         final remaining = total - done;
-        final progress = total == 0 ? 1.0 : (done / total).clamp(0.0, 1.0);
+
+        final progress = total == 0
+            ? 1.0
+            : (done / total).clamp(0.0, 1.0);
 
         final complete = total == 0 || remaining == 0;
 
@@ -479,7 +494,11 @@ class _HomePageState extends State<HomePage> {
             gradient: const LinearGradient(
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
-              colors: const [Color(0xFF17251D), Color(0xFF3D573B), Color(0xFF5D4635)],
+              colors: [
+                Color(0xFF17251D),
+                Color(0xFF3D573B),
+                Color(0xFF5D4635),
+              ],
             ),
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
@@ -490,129 +509,136 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          child: Stack(
+
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Positioned(
-                left: -28,
-                top: -30,
-                child: Icon(
-                  Icons.spa_rounded,
-                  size: 150,
-                  color: Colors.white.withOpacity(.045),
+
+              // ─────────────────────────
+              // TEXT SECTION
+              // ─────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.10),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Text(
+                        complete
+                            ? 'همه‌چیز مرتبه ✓'
+                            : 'مراقبت امروز',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    Text(
+                      complete
+                          ? 'پت هات امروز\nکامل مراقبت شدن'
+                          : '$remaining کار برای امروز باقی مونده',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        height: 1.25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Text(
+                      total == 0
+                          ? 'روتین فعالی برای امروز نداری.'
+                          : '$done از $total فعالیت انجام شده',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(.70),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        minHeight: 7,
+                        value: progress,
+                        backgroundColor:
+                            Colors.white.withOpacity(.12),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFD9E9D7),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Positioned(
-                right: -18,
-                bottom: -42,
-                child: Icon(
-                  Icons.pets_rounded,
-                  size: 130,
-                  color: Colors.white.withOpacity(.035),
+
+              // فاصله بین متن و نمودار
+              const SizedBox(width: 12),
+
+              // ─────────────────────────
+              // PROGRESS CIRCLE
+              // ─────────────────────────
+              Transform.translate(
+                offset: const Offset(8, 0),
+                child: SizedBox(
+                  width: 82,
+                  height: 82,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+
+                      SizedBox(
+                        width: 82,
+                        height: 82,
+                        child: CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 7,
+                          backgroundColor:
+                              Colors.white.withOpacity(.10),
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(
+                            Color(0xFFD9E9D7),
+                          ),
+                        ),
+                      ),
+
+                      Text(
+                        '${(progress * 100).round()}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(.10),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: Text(
-                            complete ? 'همه‌چیز مرتبه ✓' : 'مراقبت امروز',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          complete
-                              ? 'حیوون‌هات امروز\nکامل مراقبت شدن'
-                              : '$remaining کار برای امروز باقی مونده',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            height: 1.25,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          total == 0
-                              ? 'روتین فعالی برای امروز نداری.'
-                              : '$done از $total فعالیت انجام شده',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(.70),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            minHeight: 7,
-                            value: progress,
-                            backgroundColor: Colors.white.withOpacity(.12),
-                            valueColor:
-                                const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFD9E9D7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  SizedBox(
-                    width: 78,
-                    height: 78,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 78,
-                          height: 78,
-                          child: CircularProgressIndicator(
-                            value: progress,
-                            strokeWidth: 7,
-                            backgroundColor:
-                                Colors.white.withOpacity(.10),
-                            valueColor:
-                                const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFD9E9D7),
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${(progress * 100).round()}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
         );
       },
-    );
-  }
+    ),
+  );
+}
+
 
   Widget _buildQuickActions() {
     return Column(

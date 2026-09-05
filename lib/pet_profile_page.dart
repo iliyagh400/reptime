@@ -209,196 +209,101 @@ class _PetProfilePageState extends State<PetProfilePage> {
   }
 
   Future<void> _respond(Map<String, dynamic> routine, String status,
-
       {String? note}) async {
-
     final userId = Supabase.instance.client.auth.currentUser!.id;
-
     await Supabase.instance.client.from('completions').insert({
-
       'user_id': userId,
-
       'routine_id': routine['id'],
-
       'pet_id': widget.pet['id'],
-
       'completed_at': DateTime.now().toIso8601String(),
-
       'status': status,
-
       'note': note,
-
     });
-
     if (context.mounted) {
-
       ScaffoldMessenger.of(context).showSnackBar(
-
         SnackBar(
-
           content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
-
         ),
-
       );
-
     }
-
     await NotificationService.cancelOverdueReminders(routine['id']);
-
-
     final repeatType = routine['repeat_type'];
-
     if (repeatType == 'interval' || repeatType == 'once') {
-
       final completionsResponse = await Supabase.instance.client
-
           .from('completions')
-
           .select()
-
           .eq('user_id', userId)
-
           .eq('routine_id', routine['id']);
-
       final completions =
-
           List<Map<String, dynamic>>.from(completionsResponse);
-
       if (repeatType == 'once') {
-
         await NotificationService.cancelRoutineNotifications(routine['id']);
-
       } else {
-
         final next = nextDueDate(routine, completions);
-
         final petIds = List.from(routine['pet_ids'] ?? []);
-
         final petNames = _allPets
-
             .where((p) => petIds.contains(p['id']))
-
             .map((p) => p['name'] as String)
-
             .toList();
-
         await NotificationService.scheduleRoutineNotifications(
-
           routine,
-
           overrideDate: next,
-
           petNames: petNames,
-
         );
-
       }
-
     }
-
     _loadRoutines();
-
   }
 
   Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
-
     final noteController = TextEditingController();
-
     final confirmed = await showDialog<bool>(
-
       context: context,
-
       builder: (context) => AlertDialog(
-
         title: const Text('رد کردن این بار'),
-
         content: Column(
-
           mainAxisSize: MainAxisSize.min,
-
           crossAxisAlignment: CrossAxisAlignment.start,
-
           children: [
-
             const Text('چرا این بار انجامش نمی‌دی؟ (اختیاری)'),
-
             const SizedBox(height: 12),
-
             TextField(
-
               controller: noteController,
-
               maxLines: 2,
-
               decoration: const InputDecoration(
-
                 hintText: 'مثلاً: این هفته در حال پوست‌اندازیه',
-
               ),
-
             ),
-
           ],
-
         ),
-
         actions: [
-
           TextButton(
-
             onPressed: () => Navigator.pop(context, false),
-
             child: const Text('انصراف'),
-
           ),
-
           TextButton(
-
             onPressed: () => Navigator.pop(context, true),
-
             child: const Text('رد کن'),
-
           ),
-
         ],
-
       ),
-
     );
-
     if (confirmed == true) {
-
       final note = noteController.text.trim();
-
       await _respond(routine, 'skipped', note: note.isEmpty ? null : note);
-
     }
-
   }
-
   String _typeLabel(String type) {
-
     switch (type) {
-
       case 'food':
-
         return 'غذا';
-
       case 'cleaning':
-
         return 'نظافت';
-
       case 'medicine':
-
         return 'دارو';
-
       default:
-
         return 'دیگر';
-
     }
-
   }
 
   IconData _typeIcon(String type) {
