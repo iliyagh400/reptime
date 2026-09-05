@@ -40,6 +40,7 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
   late Set<String> _selectedWeekdays;
   late Set<String> _selectedPetIds;
   bool _isLoading = false;
+  TimeOfDay? _selectedTime;
 
   final _weekdayOptions = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
@@ -59,6 +60,15 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     final r = widget.routine;
     _titleController = TextEditingController(text: r['title']);
     _timeController = TextEditingController(text: r['time']);
+    final timeValue = r['time']?.toString() ?? '';
+    final timeParts = timeValue.split(':');
+    if (timeParts.length == 2) {
+      final hour = int.tryParse(timeParts[0]);
+      final minute = int.tryParse(timeParts[1]);
+      if (hour != null && minute != null && hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+        _selectedTime = TimeOfDay(hour: hour, minute: minute);
+      }
+    }
     _intervalController =
         TextEditingController(text: r['interval_days']?.toString() ?? '');
     _type = r['type'] ?? 'food';
@@ -76,6 +86,46 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     super.dispose();
   }
 
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+      helpText: 'زمان روتین را انتخاب کن',
+      cancelText: 'انصراف',
+      confirmText: 'تأیید',
+      hourLabelText: 'ساعت',
+      minuteLabelText: 'دقیقه',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: _forest,
+              onPrimary: _ink,
+              surface: _surfaceRaised,
+              onSurface: _ink,
+            ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: _surfaceRaised,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(24)),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _selectedTime = picked;
+      _timeController.text =
+          '${picked.hour.toString().padLeft(2, '0')}:'
+          '${picked.minute.toString().padLeft(2, '0')}';
+    });
+  }
+
   Future<void> _updateRoutine() async {
     if (_selectedPetIds.isEmpty) {
       _showSnack('حداقل یک حیوون انتخاب کن');
@@ -90,7 +140,10 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
             'title': _titleController.text.trim(),
             'type': _type,
             'pet_ids': _selectedPetIds.map((e) => int.parse(e)).toList(),
-            'time': _timeController.text.trim(),
+            'time': _selectedTime == null
+                ? _timeController.text.trim()
+                : '${_selectedTime!.hour.toString().padLeft(2, '0')}:'
+                  '${_selectedTime!.minute.toString().padLeft(2, '0')}',
             'repeat_type': _repeatType,
             'weekdays':
                 _repeatType == 'weekly' ? _selectedWeekdays.toList() : null,
@@ -420,10 +473,62 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildField(
-                      controller: _timeController,
-                      label: 'ساعت (مثلاً 08:00)',
-                      icon: Icons.schedule_rounded,
+                    InkWell(
+                      onTap: _pickTime,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 15),
+                        decoration: BoxDecoration(
+                          color: _inputBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _line.withOpacity(.6)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              color: _muted,
+                              size: 21,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'ساعت روتین',
+                                    style: TextStyle(
+                                      color: _muted,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    _selectedTime == null
+                                        ? 'انتخاب ساعت و دقیقه'
+                                        : _timeController.text,
+                                    style: TextStyle(
+                                      color: _selectedTime == null
+                                          ? _muted
+                                          : _ink,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: _forest,
+                              size: 24,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Wrap(

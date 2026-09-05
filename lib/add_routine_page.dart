@@ -35,6 +35,8 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
   final _timeController = TextEditingController();
   final _intervalController = TextEditingController();
 
+  TimeOfDay? _selectedTime;
+
   String _type = 'food';
   String _repeatType = 'daily';
   final Set<String> _selectedWeekdays = {};
@@ -67,6 +69,67 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
     _timeController.dispose();
     _intervalController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickTime() async {
+    final initialTime = _selectedTime ?? TimeOfDay.now();
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      helpText: 'ساعت روتین را انتخاب کن',
+      cancelText: 'انصراف',
+      confirmText: 'تأیید',
+      hourLabelText: 'ساعت',
+      minuteLabelText: 'دقیقه',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: _forest,
+              onPrimary: _ink,
+              surface: _surfaceRaised,
+              onSurface: _ink,
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: _surfaceRaised,
+            ),
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: _surfaceRaised,
+              hourMinuteColor: _inputBg,
+              hourMinuteTextColor: _ink,
+              dayPeriodColor: _inputBg,
+              dayPeriodTextColor: _ink,
+              dialBackgroundColor: _inputBg,
+              dialHandColor: _forest,
+              dialTextColor: _ink,
+              entryModeIconColor: _muted,
+              helpTextStyle: const TextStyle(
+                color: _muted,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+              hourMinuteTextStyle: const TextStyle(
+                color: _ink,
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+
+    final formatted =
+        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+
+    setState(() {
+      _selectedTime = picked;
+      _timeController.text = formatted;
+    });
   }
 
   Future<void> _saveRoutine() async {
@@ -213,6 +276,76 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: _forest, width: 1.6),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeSelector() {
+    final hasTime = _selectedTime != null;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _pickTime,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: _inputBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasTime ? _forest.withOpacity(.85) : _line.withOpacity(.6),
+              width: hasTime ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _leaf.withOpacity(.45),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  color: _forest,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ساعت روتین',
+                      style: TextStyle(
+                        color: _muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      hasTime ? _timeController.text : 'انتخاب ساعت و دقیقه',
+                      style: TextStyle(
+                        color: hasTime ? _ink : _muted,
+                        fontSize: hasTime ? 19 : 14,
+                        fontWeight: hasTime ? FontWeight.w900 : FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: _muted,
+                size: 24,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -370,11 +503,7 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildField(
-                      controller: _timeController,
-                      label: 'ساعت (مثلاً 08:00)',
-                      icon: Icons.schedule_rounded,
-                    ),
+                    _buildTimeSelector(),
                     const SizedBox(height: 16),
                     Wrap(
                       spacing: 8,
