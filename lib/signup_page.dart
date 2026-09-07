@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'home_page.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -11,67 +13,324 @@ class SignupPage extends StatefulWidget {
 class _SignupPageState extends State<SignupPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
   bool _isLoading = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
-  // ---- Reptime Design Language: Dark Terrarium palette ----
-  static const _ink = Color(0xFFECE8DD);
-  static const _muted = Color(0xFFA8A99A);
-  static const _cream = Color(0xFF141C17);
-  static const _line = Color(0xFF3A463C);
-  static const _leaf = Color(0xFF486344);
-  static const _terracotta = Color(0xFFB86F4D);
+  // متغیرهای ذخیره پیام ارور اختصاصی هر فیلد
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmPasswordError;
+
+  // Reptime Dark Terrarium theme colors
+  static const _background = Color(0xFF141C17);
   static const _surface = Color(0xFF263229);
+  static const _surfaceRaised = Color(0xFF2D3930);
+  static const _forest = Color(0xFF17251D);
+  static const _moss = Color(0xFF6E8B52);
+  static const _leaf = Color(0xFF486344);
+  static const _lightMoss = Color(0xFF8FA77B);
+  static const _sand = Color(0xFFC8A66A);
+  static const _text = Color(0xFFECE8DD);
+  static const _muted = Color(0xFFA8A99A);
+  static const _line = Color(0xFF3A463C);
+  static const _errorColor = Color(0xFFE57373); // رنگ ارور هماهنگ با تم
 
-  Future<void> _signUp() async {
-    setState(() => _isLoading = true);
+  static const String _supportTelegramId = '@ReptimeSupport';
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _showGeneralMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: _surfaceRaised,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: _line),
+        ),
+        behavior: SnackBarBehavior.floating,
+        content: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Text(text, style: const TextStyle(color: _text)),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _checkEmailAllowed(String email) async {
     try {
-      await Supabase.instance.client.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final res = await Supabase.instance.client.rpc(
+        'can_register_email',
+        params: {'check_email': email.trim().toLowerCase()},
       );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ثبت‌نام موفق بود ✅')),
-        );
-        Navigator.pop(context);
-      }
+      return res as bool? ?? false;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
-      }
-    } finally {
-      setState(() => _isLoading = false);
+      return false;
     }
   }
 
-  InputDecoration _fieldDecoration({
-    required String label,
-    required IconData icon,
+  void _showNoSubscriptionDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: _surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: _line),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.lock_person_rounded, color: _sand, size: 26),
+              SizedBox(width: 10),
+              Text(
+                'نیاز به تهیه اشتراک',
+                style: TextStyle(
+                  color: _text,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'کاربر گرامی برای استفاده از برنامه رپتایم و شروع نگه داری دقیقتر و بهینه از پت های با ارزشتون',
+                style: TextStyle(color: _muted, fontSize: 13.5, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'نیاز به اشتراک دارید برای تهیه دسترسی به برنامه با قیمت مناسب به آیدی پشتیبانی تلگرام پیام بدید',
+                style: TextStyle(color: _muted, fontSize: 13.5, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _background,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _line),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.send_rounded, color: Color(0xFF67B77C), size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        _supportTelegramId,
+                        textDirection: TextDirection.ltr,
+                        style: TextStyle(
+                          color: _text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: _muted, size: 18),
+                      tooltip: 'کپی آیدی',
+                      onPressed: () {
+                        Clipboard.setData(
+                          const ClipboardData(text: _supportTelegramId),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: _surfaceRaised,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: const BorderSide(color: _line),
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                            content: const Text(
+                              'آیدی پشتیبانی کپی شد ✅',
+                              style: TextStyle(color: _text),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'متوجه شدم',
+                style: TextStyle(color: _moss, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // اعتبارسنجی فیلدها و ثبت‌نام
+  Future<void> _signup() async {
+    final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    // ریست ارورها
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+      _confirmPasswordError = null;
+    });
+
+    bool hasError = false;
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'ایمیل را وارد کنید');
+      hasError = true;
+    } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() => _emailError = 'فرمت ایمیل نامعتبر است');
+      hasError = true;
+    }
+
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'رمز عبور را وارد کنید');
+      hasError = true;
+    } else if (password.length < 6) {
+      setState(() => _passwordError = 'حداقل ۶ کاراکتر باشد');
+      hasError = true;
+    }
+
+    if (confirmPassword.isEmpty) {
+      setState(() => _confirmPasswordError = 'تکرار رمز عبور را وارد کنید');
+      hasError = true;
+    } else if (password != confirmPassword) {
+      setState(() => _confirmPasswordError = 'تکرار رمز با رمز عبور همخوانی ندارد');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final isAllowed = await _checkEmailAllowed(email);
+
+      if (!isAllowed) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        _showNoSubscriptionDialog();
+        return;
+      }
+
+      final res = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      if (res.user != null) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
+      }
+    } on AuthException catch (e) {
+      _showGeneralMessage(e.message);
+    } catch (e) {
+      _showGeneralMessage('خطایی در ثبت‌نام رخ داد. دوباره تلاش کنید.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // ویجت عنوان بالای هر ورودی به همراه پیام ارور اختصاصی
+  Widget _buildFieldHeader(String title, String? errorText) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, right: 2, left: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: _text,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (errorText != null)
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 250),
+              opacity: 1.0,
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: _errorColor, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    errorText,
+                    style: const TextStyle(
+                      color: _errorColor,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+    bool hasError = false,
   }) {
     return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: _muted),
-      filled: true,
-      fillColor: _surface,
-      prefixIcon: Icon(icon, color: _muted, size: 20),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+      hintText: hint,
+      hintStyle: TextStyle(color: _muted.withOpacity(0.55), fontSize: 13.5),
+      prefixIcon: Icon(
+        prefixIcon,
+        color: hasError ? _errorColor : _lightMoss,
+        size: 20,
       ),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: _surfaceRaised,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: _line.withOpacity(.78)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: hasError ? _errorColor.withOpacity(0.8) : _line,
+          width: hasError ? 1.4 : 1,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: _terracotta, width: 1.4),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: hasError ? _errorColor : _moss,
+          width: 1.6,
+        ),
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
@@ -80,127 +339,307 @@ class _SignupPageState extends State<SignupPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: _cream,
+        backgroundColor: _background,
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 40),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Material(
-                    color: _surface,
-                    borderRadius: BorderRadius.circular(14),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border:
-                              Border.all(color: _line.withOpacity(.78)),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: _ink,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -80,
+                left: -70,
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _leaf.withOpacity(0.18),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: _leaf,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _leaf.withOpacity(.35),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+              ),
+              Positioned(
+                bottom: -90,
+                right: -80,
+                child: Container(
+                  width: 240,
+                  height: 240,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFB86F4D).withOpacity(0.12),
+                  ),
+                ),
+              ),
+              Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // لوگوی اپلیکیشن
+                          Center(
+                            child: Container(
+                              width: 96,
+                              height: 96,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: _surface.withOpacity(0.55),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: _lightMoss.withOpacity(0.28),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.35),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Image.asset(
+                                  'assets/reptime_logo.png',
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+
+                        const SizedBox(height: 22),
+                        const Text(
+                          'ایجاد حساب جدید',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _text,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'با رپتایم هم خودت راحت‌تری، هم پتت',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _muted,
+                            fontSize: 13.5,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 24,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _surface,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: _line, width: 1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.32),
+                                blurRadius: 22,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'مشخصات حساب',
+                                style: TextStyle(
+                                  color: _text,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+
+                              // فیلد ایمیل با هدر ارور
+                              _buildFieldHeader('ایمیل', _emailError),
+                              TextField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                textDirection: TextDirection.ltr,
+                                onChanged: (_) {
+                                  if (_emailError != null) setState(() => _emailError = null);
+                                },
+                                style: const TextStyle(
+                                  color: _text,
+                                  fontSize: 14.5,
+                                ),
+                                decoration: _inputDecoration(
+                                  hint: 'example@email.com',
+                                  prefixIcon: Icons.alternate_email_rounded,
+                                  hasError: _emailError != null,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // فیلد رمز عبور با هدر ارور
+                              _buildFieldHeader('رمز عبور', _passwordError),
+                              TextField(
+                                controller: _passwordController,
+                                obscureText: !_showPassword,
+                                textDirection: TextDirection.ltr,
+                                onChanged: (_) {
+                                  if (_passwordError != null) setState(() => _passwordError = null);
+                                },
+                                style: const TextStyle(
+                                  color: _text,
+                                  fontSize: 14.5,
+                                ),
+                                decoration: _inputDecoration(
+                                  hint: 'حداقل ۶ کاراکتر',
+                                  prefixIcon: Icons.lock_outline_rounded,
+                                  hasError: _passwordError != null,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _showPassword
+                                          ? Icons.visibility_off_rounded
+                                          : Icons.visibility_rounded,
+                                      color: _muted,
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _showPassword = !_showPassword;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // فیلد تکرار رمز عبور با هدر ارور
+                              _buildFieldHeader('تکرار رمز عبور', _confirmPasswordError),
+                              TextField(
+                                controller: _confirmPasswordController,
+                                obscureText: !_showConfirmPassword,
+                                textDirection: TextDirection.ltr,
+                                onChanged: (_) {
+                                  if (_confirmPasswordError != null) setState(() => _confirmPasswordError = null);
+                                },
+                                style: const TextStyle(
+                                  color: _text,
+                                  fontSize: 14.5,
+                                ),
+                                decoration: _inputDecoration(
+                                  hint: 'رمز عبور را مجدداً وارد کنید',
+                                  prefixIcon: Icons.lock_outline_rounded,
+                                  hasError: _confirmPasswordError != null,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _showConfirmPassword
+                                          ? Icons.visibility_off_rounded
+                                          : Icons.visibility_rounded,
+                                      color: _muted,
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _showConfirmPassword = !_showConfirmPassword;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // دکمه ثبت نام
+                              SizedBox(
+                                height: 54,
+                                child: _isLoading
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          color: _leaf.withOpacity(0.35),
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(color: _line),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.4,
+                                            color: _sand,
+                                          ),
+                                        ),
+                                      )
+                                    : ElevatedButton(
+                                        onPressed: _signup,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _moss,
+                                          foregroundColor: _text,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(18),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'ثبت‌نام',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'قبلاً ثبت‌نام کردی؟',
+                              style: TextStyle(color: _muted, fontSize: 13.5),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                foregroundColor: _sand,
+                              ),
+                              child: const Text(
+                                'وارد شو',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        const Text(
+                          'نگهداری بهتر، زندگی بهتر',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _muted,
+                            fontSize: 12,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Text(
-                        'R',
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'ساخت حساب جدید',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'به رپتایم خوش اومدی، حسابتو بساز تا شروع کنیم',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: _muted),
-                ),
-                const SizedBox(height: 36),
-                TextField(
-                  controller: _emailController,
-                  style: const TextStyle(color: _ink),
-                  decoration: _fieldDecoration(
-                      label: 'ایمیل', icon: Icons.mail_outline_rounded),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: _ink),
-                  decoration: _fieldDecoration(
-                      label: 'رمز عبور', icon: Icons.lock_outline_rounded),
-                ),
-                const SizedBox(height: 24),
-                _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: _terracotta),
-                      )
-                    : SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: _signUp,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _terracotta,
-                            foregroundColor: const Color(0xFF171B17),
-                            elevation: 4,
-                            shadowColor: _terracotta.withOpacity(.4),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Text(
-                            'ثبت‌نام',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

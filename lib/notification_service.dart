@@ -10,6 +10,13 @@ class NotificationService {
   static bool _initialized = false;
   static bool get isInitialized => _initialized;
   static Future<void> init() async {
+    // flutter_local_notifications scheduling APIs used by this service
+    // are not supported on Flutter Web. Keep the rest of the app usable.
+    if (kIsWeb) {
+      _initialized = false;
+      return;
+    }
+
     try {
       tz_data.initializeTimeZones();
 
@@ -86,6 +93,8 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
+    if (kIsWeb) return;
+
     await _notifications.zonedSchedule(
       id: id,
       title: title,
@@ -108,7 +117,7 @@ class NotificationService {
   }
 
   static Future<void> cancelNotification(int id) async {
-    if (!_initialized) return;
+    if (kIsWeb || !_initialized) return;
 
     try {
       await _notifications.cancel(id: id);
@@ -118,6 +127,8 @@ class NotificationService {
   }
 
   static Future<void> showInstantNotification() async {
+    if (kIsWeb) return;
+
     await _notifications.show(
       id: 998,
       title: 'تست فوری',
@@ -199,6 +210,10 @@ class NotificationService {
     DateTime? overrideDate,
     List<String>? petNames,
   }) async {
+    // On Web, save/update the routine normally but skip local notification
+    // scheduling because zonedSchedule() is unsupported by the plugin.
+    if (kIsWeb) return;
+
     await cancelRoutineNotifications(routine['id']);
 
     final prefs = await SharedPreferences.getInstance();
@@ -308,6 +323,8 @@ class NotificationService {
   static const int _dailySummaryId = 90000;
 
   static Future<void> updateDailySummaryNotification() async {
+    if (kIsWeb) return;
+
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('daily_summary') ?? false;
 
@@ -330,7 +347,7 @@ class NotificationService {
   static const int _maxOverdueReminders = 8;
 
   static Future<void> cancelOverdueReminders(dynamic routineId) async {
-    if (!_initialized) return;
+    if (kIsWeb || !_initialized) return;
 
     try {
       final baseId = _baseIdForRoutine(routineId);
@@ -354,6 +371,8 @@ class NotificationService {
   /// call [cancelOverdueReminders] when the routine gets marked done.
   static Future<void> refreshOverdueReminders(
       List<Map<String, dynamic>> dueUncompletedRoutines) async {
+    if (kIsWeb) return;
+
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('overdue_reminders') ?? true;
     final intervalHours = prefs.getInt('overdue_interval_hours') ?? 1;
