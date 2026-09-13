@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -181,8 +182,130 @@ class _SignupPageState extends State<SignupPage> {
       ),
     );
   }
+    // دیالوگ اختصاصی ایمیل تکراری با استایل دارک پروژه
+  void _showAlreadyRegisteredDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 390),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: _line, width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 30,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _errorColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _errorColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.mark_email_unread_rounded,
+                      color: _errorColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ایمیل قبلاً ثبت شده',
+                          style: GoogleFonts.vazirmatn(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'حساب کاربری موجود است',
+                          style: GoogleFonts.vazirmatn(
+                            fontSize: 12,
+                            color: _muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _line),
+                ),
+                child: Text(
+                  'برای این ایمیل قبلاً یک حساب کاربری ثبت شده است. لطفاً وارد شوید یا اگر رمز عبور را فراموش کرده‌اید از صفحه ورود آن را بازیابی کنید.',
+                  style: GoogleFonts.vazirmatn(
+                    fontSize: 13,
+                    height: 1.6,
+                    color: const Color(0xFFD6DDD4),
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context); // بازگشت به صفحه لاگین
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _sand,
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    'رفتن به صفحه ورود',
+                    style: GoogleFonts.vazirmatn(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 
   // اعتبارسنجی فیلدها و ثبت‌نام
+    // اعتبارسنجی فیلدها و ثبت‌نام کامل
   Future<void> _signup() async {
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
@@ -200,7 +323,7 @@ class _SignupPageState extends State<SignupPage> {
     if (email.isEmpty) {
       setState(() => _emailError = 'ایمیل را وارد کنید');
       hasError = true;
-    } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+    } else if (!RegExp(r'^[\w.\-+]+@([\w\-]+\.)+[a-zA-Z]{2,}$').hasMatch(email)) {
       setState(() => _emailError = 'فرمت ایمیل نامعتبر است');
       hasError = true;
     }
@@ -230,7 +353,6 @@ class _SignupPageState extends State<SignupPage> {
 
       if (!isAllowed) {
         if (!mounted) return;
-        setState(() => _isLoading = false);
         _showNoSubscriptionDialog();
         return;
       }
@@ -242,15 +364,33 @@ class _SignupPageState extends State<SignupPage> {
 
       if (!mounted) return;
 
-      if (res.user != null) {
+      if (res.user != null && res.session != null) {
+        // ثبت‌نام موفق + ورود مستقیم
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
+      } else if (res.user != null && res.session == null) {
+        // ثبت‌نام انجام شد اما نیاز به تایید ایمیل دارد
+        _showGeneralMessage('حساب ساخته شد؛ لینک تأیید به ایمیل شما ارسال گردید.');
+        Navigator.pop(context);
       }
     } on AuthException catch (e) {
-      _showGeneralMessage(e.message);
+      if (!mounted) return;
+      final raw = e.message.toLowerCase();
+      
+      // تشخیص خطای ثبت‌نام تکراری
+      if (raw.contains('already registered') || e.statusCode == '422') {
+        setState(() => _emailError = 'این ایمیل قبلاً ثبت‌نام کرده است');
+        _showAlreadyRegisteredDialog();
+      } else if (raw.contains('password') && raw.contains('weak')) {
+        setState(() => _passwordError = 'رمز عبور انتخاب شده ضعیف است');
+      } else if (raw.contains('rate limit')) {
+        _showGeneralMessage('تعداد درخواست‌ها زیاد است؛ لطفاً کمی صبر کنید.');
+      } else {
+        _showGeneralMessage(e.message);
+      }
     } catch (e) {
       _showGeneralMessage('خطایی در ثبت‌نام رخ داد. دوباره تلاش کنید.');
     } finally {
@@ -259,6 +399,7 @@ class _SignupPageState extends State<SignupPage> {
       }
     }
   }
+
 
   // ویجت عنوان بالای هر ورودی به همراه پیام ارور اختصاصی
   Widget _buildFieldHeader(String title, String? errorText) {

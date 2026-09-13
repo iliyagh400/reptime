@@ -408,6 +408,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
         backgroundColor: _background,
         appBar: AppBar(
           elevation: 0,
+          foregroundColor: _text,
           backgroundColor: _background,
           surfaceTintColor: Colors.transparent,
           titleSpacing: 18,
@@ -559,17 +560,12 @@ class _PetProfilePageState extends State<PetProfilePage> {
                           children: [
 
                             Text(
-
                               widget.pet['name'] ?? '',
-
                               style: const TextStyle(
-
                                 fontSize: 18,
-
                                 fontWeight: FontWeight.w600,
-
+                                color: _muted,
                               ),
-
                             ),
 
                             const SizedBox(height: 2),
@@ -587,7 +583,16 @@ class _PetProfilePageState extends State<PetProfilePage> {
                               ),
 
                             ),
-
+                          if ((widget.pet['morph'] ?? '').toString().trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                widget.pet['morph'],
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _muted,
+                                ),
+                              )),
                           ],
 
                         ),

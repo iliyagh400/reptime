@@ -31,6 +31,7 @@ class _AddPetPageState extends State<AddPetPage> {
   final _nameController = TextEditingController();
   final _customSpeciesGroupController = TextEditingController();
   final _breedController = TextEditingController();
+  final _morphController = TextEditingController();
   int? _selectedGender;
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
@@ -68,6 +69,7 @@ class _AddPetPageState extends State<AddPetPage> {
     _nameController.dispose();
     _customSpeciesGroupController.dispose();
     _breedController.dispose();
+    _morphController.dispose();
     _ageController.dispose();
     _weightController.dispose();
     super.dispose();
@@ -115,37 +117,36 @@ class _AddPetPageState extends State<AddPetPage> {
   if (result == null) return;
 
   setState(() {
-    if (result.isCustom && result.categoryName.isEmpty) {
-      // نوع و گونه کاملاً سفارشی
-      _isCustomSpecies = true;
-      _selectedCategory = null;
-      _selectedCategoryEmoji = null;
-      _selectedSpeciesImage = null;
-      _breedController.clear();
-    } else if (result.isCustom) {
-      // دسته مشخص است، اما گونه سفارشی است
-      _isCustomSpecies = false;
-      _selectedCategory = result.categoryName;
-      _selectedCategoryEmoji =
-          emojiForSpeciesGroup(result.categoryName);
+  if (result.isCustom && result.categoryName.isEmpty) {
+    // نوع و گونه کاملاً سفارشی
+    _isCustomSpecies = true;
+    _selectedCategory = null;
+    _selectedCategoryEmoji = null;
+    _selectedSpeciesImage = null;
+    _breedController.clear();
+  } else if (result.isCustom) {
+    // دسته مشخص است، اما گونه سفارشی است
+    _isCustomSpecies = false;
+    _selectedCategory = result.categoryName;
+    _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
 
-      // برای گونه سفارشی تصویری نداریم
-      _selectedSpeciesImage = null;
-      _breedController.clear();
-    } else {
-      // گونه شناخته‌شده انتخاب شده است
-      _isCustomSpecies = false;
-      _selectedCategory = result.categoryName;
-      _selectedCategoryEmoji =
-          emojiForSpeciesGroup(result.categoryName);
+    // ✅ اصلاح شد: حالا به جای null، آیکون پیش‌فرض دسته را نمایش می‌دهیم
+    _selectedSpeciesImage = defaultImagePathForGroup(result.categoryName);
+    
+    _breedController.clear();
+  } else {
+    // گونه شناخته‌شده انتخاب شده است
+    _isCustomSpecies = false;
+    _selectedCategory = result.categoryName;
+    _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
 
-      _breedController.text = result.speciesName;
+    _breedController.text = result.speciesName;
 
-      // پیدا کردن تصویر بر اساس نام گونه
-      _selectedSpeciesImage =
-          imagePathForBreed(result.speciesName);
-    }
-  });
+    // پیدا کردن تصویر بر اساس نام گونه
+    _selectedSpeciesImage = imagePathForBreed(result.speciesName);
+  }
+});
+;
 }
 
 
@@ -160,6 +161,7 @@ class _AddPetPageState extends State<AddPetPage> {
         'name': _nameController.text.trim(),
         'species_group': _finalSpeciesGroup,
         'breed': _breedController.text.trim(),
+        'morph': _morphController.text.trim(),
         'gender': _selectedGender,
         'age': _ageController.text.trim(),
         'weight': double.tryParse(_weightController.text.trim()),
@@ -465,11 +467,14 @@ Widget _buildGenderField() {
       ),
     );
   }
-
   Widget _buildSpeciesTile() {
-    final emoji = _isCustomSpecies ? '✏️' : (_selectedCategoryEmoji ?? '🔍');
-    final isPlaceholder = _selectedCategory == null && !_isCustomSpecies;
-    final label = _isCustomSpecies
+    // تشخیص اینکه چه چیزی باید نمایش داده شود:
+    // 1. اگر تصویر انتخابی وجود دارد -> تصویر PNG
+    // 2. اگر در حالت سفارشی است و تصویری نیست -> ایموجی مداد ✏️
+    // 3. در غیر این صورت -> ایموجی گروه
+    final String emoji = _isCustomSpecies ? '✏️' : (_selectedCategoryEmoji ?? '🔍');
+    final bool isPlaceholder = _selectedCategory == null && !_isCustomSpecies;
+    final String label = _isCustomSpecies
         ? otherSpeciesLabel
         : (_selectedCategory ?? 'انتخاب نوع/گونه');
 
@@ -499,8 +504,22 @@ Widget _buildGenderField() {
                   color: _leaf.withOpacity(.22),
                   borderRadius: BorderRadius.circular(12),
                 ),
+                clipBehavior: Clip.antiAlias, // برای اینکه تصویر از لبه‌ها بیرون نزند
                 child: Center(
-                  child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                  // --- بخش اصلی تغییر: نمایش تصویر به جای متن ---
+                  child: _selectedSpeciesImage != null
+                      ? Image.asset(
+                          _selectedSpeciesImage!,
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            // اگر تصویر پیدا نشد، به ایموجی سوئیچ کن
+                            return Text(emoji, style: const TextStyle(fontSize: 18));
+                          },
+                        )
+                      : Text(emoji, style: const TextStyle(fontSize: 18)),
+                  // ------------------------------------------
                 ),
               ),
               const SizedBox(width: 12),
@@ -525,6 +544,7 @@ Widget _buildGenderField() {
       ),
     );
   }
+
 
   @override
   @override
@@ -625,6 +645,14 @@ Widget build(BuildContext context) {
               controller: _breedController,
               label: 'گونه/نژاد',
               icon: Icons.science_outlined,
+            ),
+
+            const SizedBox(height: 12),
+
+            _buildField(
+              controller: _morphController,
+              label: 'مورف',
+              icon: Icons.auto_awesome_rounded,
             ),
 
             _sectionLabel('جزئیات بیشتر'),

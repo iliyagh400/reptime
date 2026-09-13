@@ -34,6 +34,7 @@ class _EditPetPageState extends State<EditPetPage> {
   late final TextEditingController _breedController;
   late final TextEditingController _ageController;
   late final TextEditingController _weightController;
+  late final TextEditingController _morphController;
 
   int? _selectedGender;
   int _selectedAgeYears = 0;
@@ -73,6 +74,9 @@ class _EditPetPageState extends State<EditPetPage> {
 
     _weightController = TextEditingController(
       text: widget.pet['weight']?.toString() ?? '',
+    );
+    _morphController = TextEditingController(
+      text: (widget.pet['morph'] as String?) ?? '',
     );
 
     _customSpeciesGroupController = TextEditingController();
@@ -131,6 +135,7 @@ class _EditPetPageState extends State<EditPetPage> {
     _breedController.dispose();
     _ageController.dispose();
     _weightController.dispose();
+    _morphController.dispose();
     super.dispose();
   }
 
@@ -260,6 +265,7 @@ class _EditPetPageState extends State<EditPetPage> {
         'gender': _selectedGender,
         'age': _ageController.text.trim(),
         'weight': double.tryParse(_weightController.text.trim()),
+        'morph': _morphController.text.trim(),
         'birthDate': _birthDate?.toIso8601String(),
       }).eq('id', widget.pet['id']);
 
@@ -893,6 +899,11 @@ class _EditPetPageState extends State<EditPetPage> {
                       label: 'وزن (گرم)',
                       icon: Icons.monitor_weight_rounded,
                       keyboardType: TextInputType.number,
+                    ),
+                    _buildField(
+                      controller: _morphController,
+                      label: 'مورف',
+                      icon: Icons.auto_awesome_rounded,
                     ),
                   ],
                 ),

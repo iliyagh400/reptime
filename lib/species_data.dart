@@ -92,6 +92,35 @@ const String otherSpeciesLabel = 'دیگر (خودم می‌نویسم)';
 const String defaultSpeciesEmoji = '🐾';
 const String speciesImageFolder = 'assets/icons/species';
 
+
+
+/// آیکون پیش‌فرض گروه — وقتی کاربر «دیگر» انتخاب کرده یا breed ناشناخته‌ست
+const Map<String, String> defaultSpeciesAssetForGroup = {
+  'مار':      'default_snake',
+  'سوسمار':   'default_lizard',
+  'گکو':      'default_gecko',
+  'لاک‌پشت':  'default_turtle',
+  'بندپایان': 'default_arthropod',
+  'آکواریوم': 'default_aquatic',
+  'دوزیست':   'default_amphibian',
+};
+/// آیکون پیش‌فرض برای گزینه «دیگر» در هر دسته
+String? defaultImagePathForGroup(String categoryName) {
+  const map = {
+    'مار': 'default_snake',     
+  'سوسمار':   'default_lizard',
+  'گکو':      'default_gecko',
+  'لاک‌پشت':  'default_turtle',
+  'بندپایان': 'default_arthropod',
+  'آکواریوم': 'default_aquatic',
+  'دوزیست':   'default_amphibian',
+    // ... باقی دسته‌ها را با assetKey آیکون پیش‌فرض خودتان پر کنید
+  };
+  final key = map[categoryName];
+  return key == null ? null : '$speciesImageFolder/$key.png';
+}
+
+
 /// Returns the emoji matching a pet's stored species_group (category)
 /// text. Falls back to a generic paw print for anything custom/typed
 /// manually that isn't in the known category list.
@@ -103,13 +132,11 @@ String emojiForSpeciesGroup(String? speciesGroup) {
   return defaultSpeciesEmoji;
 }
 
-/// Returns the expected image asset path for a pet's stored breed (the
-/// specific species text, e.g. 'کورن اسنیک'), or null if the breed text
-/// doesn't match any known species (custom/typed breeds have no image).
-/// The image file itself may or may not exist yet — callers should use
-/// an errorBuilder on Image.asset to fall back to the category emoji.
-String? imagePathForBreed(String? breed) {
-  if (breed == null) return null;
+
+String? imagePathForBreed(String? breed, {String? speciesGroup}) {
+  if (breed == null || breed.trim().isEmpty) return null;
+
+  // جستجوی دقیق در لیست گونه‌های شناخته‌شده
   for (final category in speciesCategories) {
     for (final species in category.species) {
       if (species.label == breed) {
@@ -117,7 +144,16 @@ String? imagePathForBreed(String? breed) {
       }
     }
   }
-  return null;
+
+  // breed ناشناخته یا «دیگر» → آیکون پیش‌فرض گروه
+  return _defaultAssetForGroup(speciesGroup);
+}
+
+String? _defaultAssetForGroup(String? speciesGroup) {
+  if (speciesGroup == null) return null;
+  final assetKey = defaultSpeciesAssetForGroup[speciesGroup];
+  if (assetKey == null) return null;
+  return '$speciesImageFolder/$assetKey.png';
 }
 
 /// A single search-result row: which category a species belongs to, plus

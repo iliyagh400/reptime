@@ -1176,17 +1176,43 @@ class _PetCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 5),
-                        Text(
-                          breed,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _HomePageState._muted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              breed,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _HomePageState._muted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if ((pet['morph'] ?? '').toString().trim().isNotEmpty) ...[
+                              const Text(
+                                ' — ',
+                                style: TextStyle(
+                                  color: _HomePageState._muted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  pet['morph'],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _HomePageState._muted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+
                         const SizedBox(height: 10),
                         Row(
                           children: [

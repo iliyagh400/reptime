@@ -239,24 +239,48 @@ class _SpeciesPickerPageState extends State<SpeciesPickerPage> {
   }
 
   Widget _speciesLeadingIcon(String categoryEmoji, Species species) {
-    final imagePath = '$speciesImageFolder/${species.assetKey}.png';
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        width: 34,
-        height: 34,
-        child: Image.asset(
-          imagePath,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Center(
-              child: Text(categoryEmoji, style: const TextStyle(fontSize: 20)),
-            );
-          },
-        ),
+  // اگر گونه‌ی سفارشی (Custom) بود، آیکون پیش‌فرض را نشان بده
+  if (species.label == "دیگر" || species.label.isEmpty) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: _forest.withOpacity(0.18), // استفاده از رنگ‌های موجود در تم شما
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(
+        Icons.edit_rounded, // یا Icons.pets_rounded برای نماد حیوان
+        size: 20,
+        color: _leaf, // استفاده از رنگ برگ/سبز موجود در تم شما
       ),
     );
   }
+
+  // منطق فعلی شما برای نمایش عکس یا ایموجی
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(10),
+    child: Image.asset(
+      '$speciesImageFolder/${species.assetKey}.png',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _leaf.withOpacity(0.22),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            categoryEmoji,
+            style: const TextStyle(fontSize: 20),
+          ),
+        );
+      },
+    ),
+  );
+}
+
 
   Widget _speciesTile(String categoryName, String emoji, Species species) {
     return Container(
