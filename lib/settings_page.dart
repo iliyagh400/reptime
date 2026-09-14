@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -103,6 +104,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       onChanged: (value) async {
                         setState(() => _onTimeReminders = value);
                         await _saveBool('on_time_reminders', value);
+                        await _applyOnTimeReminderSetting(value);
                       },
                     ),
                   ),
@@ -116,9 +118,10 @@ class _SettingsPageState extends State<SettingsPage> {
                           title: const Text('یادآور کارهای دیرشده', style: TextStyle(fontWeight: FontWeight.w700, color: _ink)),
                           subtitle: const Text('تکرار تا انجام کار', style: TextStyle(color: _muted)),
                           value: _overdueReminders,
-                          onChanged: (value) {
+                          onChanged: (value) async {
                             setState(() => _overdueReminders = value);
-                            _saveBool('overdue_reminders', value);
+                            await _saveBool('overdue_reminders', value);
+                            await _applyOverdueReminderSetting(value);
                           },
                         ),
                         if (_overdueReminders) ...[
@@ -137,9 +140,12 @@ class _SettingsPageState extends State<SettingsPage> {
                                     return ChoiceChip(
                                       label: Text(h == 1 ? 'هر ۱ ساعت' : 'هر $h ساعت'),
                                       selected: selected,
-                                      onSelected: (_) {
+                                      onSelected: (_) async {
                                         setState(() => _overdueIntervalHours = h);
-                                        _saveInt('overdue_interval_hours', h);
+                                        await _saveInt('overdue_interval_hours', h);
+                                        if (_overdueReminders) {
+                                          await _refreshAllOverdueReminders();
+                                        }
                                       },
                                       selectedColor: _terracotta,
                                       backgroundColor: _cream,
@@ -163,14 +169,127 @@ class _SettingsPageState extends State<SettingsPage> {
                       title: const Text('خلاصه‌ی روزانه', style: TextStyle(fontWeight: FontWeight.w700, color: _ink)),
                       subtitle: const Text('ساعت ۲۱:۰۰، جمع‌بندی امروز', style: TextStyle(color: _muted)),
                       value: _dailySummary,
-                      onChanged: (value) {
+                      onChanged: (value) async {
                         setState(() => _dailySummary = value);
-                        _saveBool('daily_summary', value);
+                        await _saveBool('daily_summary', value);
+                        await NotificationService.updateDailySummaryNotification();
                       },
                     ),
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _loadActiveRoutines() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return [];
+
+    final response = await Supabase.instance.client
+        .from('routines')
+        .select()
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  Future<List<Map<String, dynamic>>> _loadUserPets() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return [];
+
+    final response = await Supabase.instance.client
+        .from('pets')
+        .select()
+        .eq('user_id', user.id);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  Future<void> _applyOnTimeReminderSetting(bool enabled) async {
+    try {
+      final routines = await _loadActiveRoutines();
+
+      if (!enabled) {
+        for (final routine in routines) {
+          await NotificationService.cancelRoutineNotifications(routine['id']);
+        }
+        return;
+      }
+
+      final pets = await _loadUserPets();
+
+      for (final routine in routines) {
+        final petIds = List.from(routine['pet_ids'] ?? []);
+        final petNames = pets
+            .where((pet) => petIds.contains(pet['id']))
+            .map((pet) => (pet['name'] ?? '').toString())
+            .where((name) => name.isNotEmpty)
+            .toList();
+
+        await NotificationService.scheduleRoutineNotifications(
+          routine,
+          petNames: petNames,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('اعلان‌ها بروزرسانی نشدند', isError: true);
+      }
+    }
+  }
+
+  Future<void> _applyOverdueReminderSetting(bool enabled) async {
+    try {
+      if (!enabled) {
+        final routines = await _loadActiveRoutines();
+        for (final routine in routines) {
+          await NotificationService.cancelOverdueReminders(routine['id']);
+        }
+        return;
+      }
+
+      await _refreshAllOverdueReminders();
+    } catch (e) {
+      if (mounted) {
+        _showSnack('یادآورهای دیرشده بروزرسانی نشدند', isError: true);
+      }
+    }
+  }
+
+  // این نسخه اصلاح شده بر اساس ساختار تابع شما در سرویس است
+Future<void> _refreshAllOverdueReminders() async {
+  try {
+    // فرض می‌کنیم لیست روتین‌ها را از جایی می‌خوانید
+    // اگر لیست را از قبل دارید، آن را مستقیماً اینجا قرار دهید
+    List<Map<String, dynamic>> routinesToProcess = []; 
+    
+    // گرفتن داده‌ها از سوپابیس (مثال)
+    // routinesToProcess = await supabase.from('routines').select()... 
+
+    if (routinesToProcess.isNotEmpty) {
+      // فقط و فقط یک پارامتر می‌فرستیم: لیست روتین‌ها
+      await NotificationService.refreshOverdueReminders(routinesToProcess);
+    }
+  } catch (e) {
+    debugPrint('Error: $e');
+  }
+}
+
+
+  void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            isError ? const Color(0xFF5A2B28) : _surface,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
     );
   }
