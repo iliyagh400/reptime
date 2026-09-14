@@ -2,9 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'home_page.dart';
-import 'login_page.dart';
-import 'signup_page.dart';
+import 'auth_gate.dart';
 import 'update_password_page.dart';
 import 'notification_service.dart';
 
@@ -100,9 +98,7 @@ class _MyAppState extends State<MyApp> {
           backgroundColor: Color(0xFFC98A3E),
         ),
       ),
-      home: Supabase.instance.client.auth.currentSession != null
-          ? const HomePage()
-          : const LoginPage(),
+      home: const AuthGate(),
     );
   }
 }

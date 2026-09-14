@@ -17,7 +17,7 @@ class AuthRepository {
   // استریم تغییرات وضعیت احراز هویت (Login / Logout)
   Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 
-  // ۱. بررسی مجاز بودن کاربر در جدول allowed_users (بر اساس ایمیل یا user_id)
+  // بررسی مجاز بودن کاربر در جدول allowed_users (بر اساس ایمیل)
   Future<bool> isUserAllowed() async {
     final user = currentUser;
     if (user == null) return false;
@@ -26,7 +26,6 @@ class AuthRepository {
       final email = user.email?.toLowerCase().trim();
       if (email == null) return false;
 
-      // بررسی بر اساس ستون email در جدول allowed_users
       final response = await _supabase
           .from('allowed_users')
           .select('email')
@@ -35,12 +34,11 @@ class AuthRepository {
 
       return response != null;
     } catch (e) {
-      // در صورت وقوع هر خطایی، دسترسی بسته می‌ماند
       return false;
     }
   }
 
-  // ۲. ورود با ایمیل و پسورد
+  // ورود با ایمیل و پسورد
   Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -51,7 +49,7 @@ class AuthRepository {
     );
   }
 
-  // ۳. ثبت‌نام با ایمیل و پسورد
+  // ثبت‌نام با ایمیل و پسورد
   Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -64,12 +62,12 @@ class AuthRepository {
     );
   }
 
-  // ۴. خروج از حساب کاربری
+  // خروج از حساب کاربری
   Future<void> signOut() async {
     await _supabase.auth.signOut();
   }
 
-  // ۵. ارسال ایمیل بازیابی رمز عبور
+  // ارسال ایمیل بازیابی رمز عبور
   Future<void> resetPassword(String email) async {
     await _supabase.auth.resetPasswordForEmail(email.trim());
   }
