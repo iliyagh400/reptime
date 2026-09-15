@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'repositories/auth_repository.dart';
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
 
@@ -15,6 +15,7 @@ class _SignupPageState extends State<SignupPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final AuthRepository _authRepo = AuthRepository();
 
   bool _isLoading = false;
   bool _showPassword = false;
@@ -67,17 +68,10 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
-  Future<bool> _checkEmailAllowed(String email) async {
-    try {
-      final res = await Supabase.instance.client.rpc(
-        'can_register_email',
-        params: {'check_email': email.trim().toLowerCase()},
-      );
-      return res as bool? ?? false;
-    } catch (e) {
-      return false;
-    }
+    Future<bool> _checkEmailAllowed(String email) async {
+    return await _authRepo.checkEmailAllowed(email);
   }
+
 
   void _showNoSubscriptionDialog() {
     showDialog(
@@ -357,10 +351,10 @@ class _SignupPageState extends State<SignupPage> {
         return;
       }
 
-      final res = await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-      );
+     final res = await _authRepo.signUp(
+          email: email,
+          password: password,
+        );
 
       if (!mounted) return;
 
