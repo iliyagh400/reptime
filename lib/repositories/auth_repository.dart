@@ -3,72 +3,86 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRepository {
-  final SupabaseClient _supabase;
+  final SupabaseClient _client;
 
-  AuthRepository({SupabaseClient? supabaseClient})
-      : _supabase = supabaseClient ?? Supabase.instance.client;
+  AuthRepository({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
 
-  // وضعیت لاگین و کاربر فعلی
-  User? get currentUser => _supabase.auth.currentUser;
-  bool get isAuthenticated => currentUser != null;
-  String? get currentUserId => currentUser?.id;
-  String? get currentUserEmail => currentUser?.email;
+  // استریم تغییرات احراز هویت
+  Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
-  // استریم تغییرات وضعیت احراز هویت (Login / Logout)
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+  // سشن و کاربر فعلی
+  Session? get currentSession => _client.auth.currentSession;
+  User? get currentUser => _client.auth.currentUser;
+  String? get currentUserId => _client.auth.currentUser?.id;
+  String? get currentUserEmail => _client.auth.currentUser?.email;
 
-  // بررسی مجاز بودن کاربر در جدول allowed_users (بر اساس ایمیل)
-  Future<bool> isUserAllowed() async {
-    final user = currentUser;
-    if (user == null) return false;
-
-    try {
-      final email = user.email?.toLowerCase().trim();
-      if (email == null) return false;
-
-      final response = await _supabase
-          .from('allowed_users')
-          .select('email')
-          .eq('email', email)
-          .maybeSingle();
-
-      return response != null;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // ورود با ایمیل و پسورد
+  // ورود با ایمیل و رمز
   Future<AuthResponse> signIn({
     required String email,
     required String password,
   }) async {
-    return await _supabase.auth.signInWithPassword(
+    return await _client.auth.signInWithPassword(
       email: email.trim(),
       password: password,
     );
   }
 
-  // ثبت‌نام با ایمیل و پسورد
+  // ثبت‌نام کاربر جدید
   Future<AuthResponse> signUp({
     required String email,
     required String password,
-    Map<String, dynamic>? data,
   }) async {
-    return await _supabase.auth.signUp(
+    return await _client.auth.signUp(
       email: email.trim(),
       password: password,
-      data: data,
     );
   }
 
-  // خروج از حساب کاربری
+  // خروج از حساب
   Future<void> signOut() async {
-    await _supabase.auth.signOut();
+    await _client.auth.signOut();
   }
 
-  // ارسال ایمیل بازیابی رمز عبور
-  Future<void> resetPassword(String email) async {
-    await _supabase.auth.resetPasswordForEmail(email.trim());
+  // بازیابی رمز عبور
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _client.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: 'reptime://reset-password',
+    );
+  }
+
+  // بررسی مجاز بودن کاربر لاگین شده بر اساس جدول allowed_users
+  Future<bool> isUserAllowed() async {
+    final email = currentUserEmail;
+    if (email == null) return false;
+    return await checkEmailAllowed(email);
+  }
+
+  // بررسی مجاز بودن ایمیل از طریق RPC یا کوئری
+  Future<bool> checkEmailAllowed(String email) async {
+    try {
+      final res = await _client.rpc(
+        'can_register_email',
+        params: {'check_email': email.trim().toLowerCase()},
+      );
+      return res == true;
+    } catch (_) {
+      // در صورت بروز خطا به دلیل مسائل امنیتی مسدود می‌شود
+      return false;
+    }
+  }
+
+  // بررسی وجود داشتن ایمیل ثبت‌شده در دیتابیس
+  Future<bool> checkUserExists(String email) async {
+    try {
+      final res = await _client.rpc(
+        'user_exists_by_email',
+        params: {'check_email': email.trim().toLowerCase()},
+      );
+      return res == true;
+    } catch (_) {
+      return true; // در صورت خطا پیش‌فرض true برمی‌گرداند تا ایمیل لو نرود
+    }
   }
 }

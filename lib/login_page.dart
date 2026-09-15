@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
 import 'signup_page.dart';
-
+import 'repositories/auth_repository.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -13,6 +13,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final AuthRepository _authRepo = AuthRepository();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -42,14 +43,8 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<bool> _checkEmailAllowed(String email) async {
-    try {
-      final res = await Supabase.instance.client
-          .rpc('can_register_email', params: {'check_email': email.trim().toLowerCase()});
-      return res == true;
-    } catch (_) {
-      return false;
-    }
+   Future<bool> _checkEmailAllowed(String email) async {
+    return await _authRepo.checkEmailAllowed(email);
   }
     // دیالوگ «ایمیل قبلاً ثبت شده است»
   void _showAlreadyRegisteredDialog() {
@@ -613,24 +608,9 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<bool> _userExists(String email) async {
-  try {
-    final result = await Supabase.instance.client.rpc(
-      'user_exists_by_email',
-      params: {
-        'check_email': email.trim().toLowerCase(),
-      },
-    );
-
-    return result == true;
-  } catch (e) {
-    debugPrint('user_exists_by_email error: $e');
-
-    // برای جلوگیری از افشای اطلاعات در صورت خطای RPC،
-    // به‌صورت پیش‌فرض ایمیل را موجود فرض می‌کنیم.
-    return true;
+Future<bool> _userExists(String email) async {
+    return await _authRepo.checkUserExists(email);
   }
-}
 
   // دیالوگ فراموشی رمز عبور
   void _showForgotPasswordDialog() {
@@ -763,10 +743,7 @@ class _LoginPageState extends State<LoginPage> {
                                 setDialogState(() => isSubmitting = true);
 
                                 try {
-                                  await Supabase.instance.client.auth.resetPasswordForEmail(
-                                    email,
-                                    redirectTo: 'reptime://reset-password',
-                                  );
+                                  await _authRepo.sendPasswordResetEmail(email);
 
                                   if (ctx.mounted) {
                                     Navigator.pop(ctx);
@@ -858,9 +835,9 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       // ۱) اول احراز هویت، بدون گیت اشتراک
-      await Supabase.instance.client.auth.signInWithPassword(
+     await _authRepo.signIn(
         email: email,
-        password: password,
+        password: _passwordController.text,
       );
 
       if (!mounted) return;
@@ -869,7 +846,7 @@ class _LoginPageState extends State<LoginPage> {
       final isAllowed = await _checkEmailAllowed(email);
       if (!isAllowed) {
         // خارج کردن از اکانت تا یوزر اشتراک‌نداشت وارد نشود
-        await Supabase.instance.client.auth.signOut();
+        await _authRepo.signOut();
         _showNoSubscriptionDialog(context);
         return;
       }
