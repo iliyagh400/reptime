@@ -60,119 +60,171 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadPets() async {
-    if (mounted) setState(() => _isLoading = true);
-
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-
-    final response = await Supabase.instance.client
-        .from('pets')
-        .select()
-        .eq('user_id', userId);
-
     if (!mounted) return;
+    setState(() => _isLoading = true);
 
-    setState(() {
-      _pets = List<Map<String, dynamic>>.from(response);
-      _isLoading = false;
-    });
-  }
-
-  Future<Map<String, int>> _todayTaskStatus(dynamic petId) async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-
-    final routinesResponse = await Supabase.instance.client
-        .from('routines')
-        .select()
-        .eq('user_id', userId)
-        .eq('is_active', true);
-
-    final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
-
-    final petRoutines = allRoutines.where((r) {
-      final ids = List.from(r['pet_ids'] ?? []);
-      return ids.contains(petId);
-    }).toList();
-
-    final completionsResponse = await Supabase.instance.client
-        .from('completions')
-        .select()
-        .eq('user_id', userId)
-        .eq('pet_id', petId);
-
-    final completions =
-        List<Map<String, dynamic>>.from(completionsResponse);
-
-    int total = 0;
-    int done = 0;
-
-    for (final routine in petRoutines) {
-      if (isRelevantToday(routine, completions)) {
-        if (isSkippedToday(routine, completions)) continue;
-
-        total++;
-
-        if (isDoneToday(routine, completions)) {
-          done++;
-        }
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        if (!mounted) return;
+        setState(() {
+          _pets = [];
+          _isLoading = false;
+        });
+        return;
       }
-    }
 
-    return {'total': total, 'done': done};
+      final response = await Supabase.instance.client
+          .from('pets')
+          .select()
+          .eq('user_id', currentUser.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        _pets = List<Map<String, dynamic>>.from(response);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
-  Future<Map<String, int>> _overallTodayStatus() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
 
-    final routinesResponse = await Supabase.instance.client
-        .from('routines')
-        .select()
-        .eq('user_id', userId)
-        .eq('is_active', true);
+   Future<Map<String, int>> _todayTaskStatus(dynamic petId) async {
+    try {
+      // ۱. بررسی ایمن کاربر (بدون !)
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        return {'total': 0, 'done': 0};
+      }
 
-    final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
+      final userId = currentUser.id;
+      final targetPetIdStr = petId?.toString();
 
-    final completionsResponse = await Supabase.instance.client
-        .from('completions')
-        .select()
-        .eq('user_id', userId);
+      final routinesResponse = await Supabase.instance.client
+          .from('routines')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_active', true);
 
-    final allCompletions =
-        List<Map<String, dynamic>>.from(completionsResponse);
+      final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
 
-    int total = 0;
-    int done = 0;
-    final List<Map<String, dynamic>> dueUncompleted = [];
+      // ۳. مقایسه ایمن و رشته‌ای pet_ids با toString() جهت جلوگیری از عدم تطابق int و String
+      final petRoutines = allRoutines.where((r) {
+        final rawIds = r['pet_ids'];
+        if (rawIds is! List) return false;
+        return rawIds.any((id) => id?.toString() == targetPetIdStr);
+      }).toList();
 
-    for (final routine in allRoutines) {
-      final petIds = List.from(routine['pet_ids'] ?? []);
-      bool anyPetDueUncompleted = false;
+      final completionsResponse = await Supabase.instance.client
+          .from('completions')
+          .select()
+          .eq('user_id', userId);
 
-      for (final petId in petIds) {
-        final petCompletions =
-            allCompletions.where((c) => c['pet_id'] == petId).toList();
+      // فیلتر کردن completions به صورت ایمن بر اساس pet_id به حالت رشته‌ای
+      final completions = List<Map<String, dynamic>>.from(completionsResponse)
+          .where((c) => c['pet_id']?.toString() == targetPetIdStr)
+          .toList();
 
-        if (isSkippedToday(routine, petCompletions)) continue;
+      int total = 0;
+      int done = 0;
 
-        if (isRelevantToday(routine, petCompletions)) {
+      for (final routine in petRoutines) {
+        if (isRelevantToday(routine, completions)) {
+          if (isSkippedToday(routine, completions)) continue;
+
           total++;
 
-          if (isDoneToday(routine, petCompletions)) {
+          if (isDoneToday(routine, completions)) {
             done++;
-          } else {
-            anyPetDueUncompleted = true;
           }
         }
       }
 
-      if (anyPetDueUncompleted) {
-        dueUncompleted.add(routine);
-      }
+      return {'total': total, 'done': done};
+    } catch (e) {
+      // ۲. بلوک try/catch جهت بازگرداندن خروجی امن در صورت وقوع هرگونه خطا
+      return {'total': 0, 'done': 0};
     }
-
-    await NotificationService.refreshOverdueReminders(dueUncompleted);
-
-    return {'total': total, 'done': done};
   }
+
+
+   Future<Map<String, int>> _overallTodayStatus() async {
+    try {
+      // ۱. بررسی ایمن کاربر (بدون !)
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        return {'total': 0, 'done': 0};
+      }
+
+      final userId = currentUser.id;
+
+      final routinesResponse = await Supabase.instance.client
+          .from('routines')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_active', true);
+
+      final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
+
+      final completionsResponse = await Supabase.instance.client
+          .from('completions')
+          .select()
+          .eq('user_id', userId);
+
+      final allCompletions =
+          List<Map<String, dynamic>>.from(completionsResponse);
+
+      int total = 0;
+      int done = 0;
+      final List<Map<String, dynamic>> dueUncompleted = [];
+
+      // ۳. پیمایش ایمن با گارد در برابر مقادیر null و مقایسه رشته‌ای pet_id
+      for (final routine in allRoutines) {
+        final rawPetIds = routine['pet_ids'];
+        if (rawPetIds is! List) continue;
+
+        bool anyPetDueUncompleted = false;
+
+        for (final petId in rawPetIds) {
+          if (petId == null) continue;
+          final petIdStr = petId.toString();
+
+          final petCompletions = allCompletions
+              .where((c) => c['pet_id']?.toString() == petIdStr)
+              .toList();
+
+          if (isSkippedToday(routine, petCompletions)) continue;
+
+          if (isRelevantToday(routine, petCompletions)) {
+            total++;
+
+            if (isDoneToday(routine, petCompletions)) {
+              done++;
+            } else {
+              anyPetDueUncompleted = true;
+            }
+          }
+        }
+
+        if (anyPetDueUncompleted) {
+          dueUncompleted.add(routine);
+        }
+      }
+
+      await NotificationService.refreshOverdueReminders(dueUncompleted);
+
+      return {'total': total, 'done': done};
+    } catch (e) {
+      // ۲. بازگرداندن مقدار امن در صورت وقوع هرگونه خطای شبکه، دیتابیس یا ناتوانی در دسترسی
+      return {'total': 0, 'done': 0};
+    }
+  }
+
 
   Widget _buildPetIcon(
     Map<String, dynamic> pet, {
@@ -271,6 +323,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -307,6 +360,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
 
   Widget _buildContent() {
     return CustomScrollView(
@@ -507,16 +561,21 @@ Widget _buildTodayHero() {
             child: FutureBuilder<Map<String, int>>(
               future: _overallTodayStatus(),
               builder: (context, snapshot) {
-                final total = snapshot.data?['total'] ?? 0;
-                final done = snapshot.data?['done'] ?? 0;
+                // گارد ایمنی در صورت بروز خطا، نبود داده یا نال بودن snapshot
+                final status = (snapshot.hasError || !snapshot.hasData || snapshot.data == null)
+                    ? {'total': 0, 'done': 0}
+                    : snapshot.data!;
 
-                final remaining = total - done;
+                final total = status['total'] ?? 0;
+                final done = status['done'] ?? 0;
 
-                final progress = total == 0
-                    ? 1.0
-                    : (done / total).clamp(0.0, 1.0);
+                final remaining = (total - done).clamp(0, total);
 
-                final complete = total == 0 || remaining == 0;
+                // اگر کاری وجود نداشته باشد، درصد صفر است؛ در غیر این صورت درصد واقعی محاسبه می‌شود
+                final progress = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
+
+                // کامل بودن فقط زمانی است که حداقل یک کار داشته باشیم و همه انجام شده باشند
+                final complete = total > 0 && done == total;
 
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -818,15 +877,19 @@ Widget _buildTodayHero() {
       itemBuilder: (context, index) {
         final pet = filteredPets[index];
 
-        return FutureBuilder<Map<String, int>>(
+     return FutureBuilder<Map<String, int>>(
           future: _todayTaskStatus(pet['id']),
           builder: (context, snapshot) {
-            final total = snapshot.data?['total'] ?? 0;
-            final done = snapshot.data?['done'] ?? 0;
+            // گارد ایمنی کامل در برابر خطای شبکه، نبود داده یا نال بودن snapshot
+            final status = (snapshot.hasError || !snapshot.hasData || snapshot.data == null)
+                ? {'total': 0, 'done': 0}
+                : snapshot.data!;
+
+            final total = status['total'] ?? 0;
+            final done = status['done'] ?? 0;
             final progress =
                 total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
             final allDone = total > 0 && done >= total;
-
             return Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 20,
