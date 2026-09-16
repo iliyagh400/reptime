@@ -1,11 +1,50 @@
+DateTime? _tryParseDate(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value.toLocal();
+  return DateTime.tryParse(value.toString())?.toLocal();
+}
+
+int _parseIntervalDays(dynamic value) {
+  if (value == null) return 1;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString()) ?? 1;
+}
+
+int? _parseMonthDay(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+int _lastDayOfMonth(int year, int month) {
+  return DateTime(year, month + 1, 0).day;
+}
+
+int _clampedMonthDay(int year, int month, int monthDay) {
+  final lastDay = _lastDayOfMonth(year, month);
+  if (monthDay < 1) return 1;
+  return monthDay > lastDay ? lastDay : monthDay;
+}
+
+DateTime _dateOnly(DateTime date) {
+  return DateTime(date.year, date.month, date.day);
+}
+
 Map<String, dynamic>? _lastResponseRecord(
     List<Map<String, dynamic>> completions, dynamic routineId) {
-  final matches =
-      completions.where((c) => c['routine_id'] == routineId).toList();
+  final matches = completions.where((c) {
+    final status = c['status']?.toString();
+    final isHandled = status == 'completed' || status == 'done' || status == 'skipped';
+    return c['routine_id']?.toString() == routineId?.toString() &&
+        isHandled &&
+        _tryParseDate(c['completed_at']) != null;
+  }).toList();
   if (matches.isEmpty) return null;
 
-  matches.sort((a, b) => DateTime.parse(b['completed_at'])
-      .compareTo(DateTime.parse(a['completed_at'])));
+  matches.sort((a, b) => _tryParseDate(b['completed_at'])!
+      .compareTo(_tryParseDate(a['completed_at'])!));
 
   return matches.first;
 }
@@ -18,13 +57,14 @@ DateTime? lastCompletionDate(
     List<Map<String, dynamic>> completions, dynamic routineId) {
   final record = _lastResponseRecord(completions, routineId);
   if (record == null) return null;
-  return DateTime.parse(record['completed_at']);
+  return _tryParseDate(record['completed_at']);
 }
 
 bool _isRecordToday(Map<String, dynamic>? record, String status) {
   if (record == null) return false;
   if (record['status'] != status) return false;
-  final date = DateTime.parse(record['completed_at']);
+  final date = _tryParseDate(record['completed_at']);
+  if (date == null) return false;
   final now = DateTime.now();
   return date.year == now.year &&
       date.month == now.month &&
@@ -34,7 +74,7 @@ bool _isRecordToday(Map<String, dynamic>? record, String status) {
 bool isDoneToday(
     Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
   final record = _lastResponseRecord(completions, routine['id']);
-  return _isRecordToday(record, 'done');
+  return _isRecordToday(record, 'completed') || _isRecordToday(record, 'done');
 }
 
 bool isSkippedToday(
@@ -80,20 +120,20 @@ bool isDueToday(
       return weekdays.contains(todayName);
 
     case 'monthly':
-      final monthDay = routine['month_day'];
-      return monthDay != null && now.day == monthDay;
+      final monthDay = _parseMonthDay(routine['month_day']);
+      if (monthDay == null) return false;
+      final clamped = _clampedMonthDay(now.year, now.month, monthDay);
+      return now.day == clamped;
 
     case 'interval':
-      final intervalDays = routine['interval_days'] ?? 1;
+      final intervalDays = _parseIntervalDays(routine['interval_days']);
       DateTime baseDate;
       if (lastDone != null) {
-        final lastDoneDay =
-            DateTime(lastDone.year, lastDone.month, lastDone.day);
+        final lastDoneDay = _dateOnly(lastDone);
         baseDate = lastDoneDay.add(Duration(days: intervalDays));
       } else {
-        final startDateStr = routine['start_date'];
-        baseDate =
-            startDateStr != null ? DateTime.parse(startDateStr) : today;
+        final startDate = _tryParseDate(routine['start_date']);
+        baseDate = startDate != null ? _dateOnly(startDate) : today;
       }
       return !today.isBefore(baseDate);
 
@@ -160,26 +200,30 @@ DateTime? nextDueDate(
       return null;
 
     case 'monthly':
-      final monthDay = routine['month_day'];
+      final monthDay = _parseMonthDay(routine['month_day']);
       if (monthDay == null) return null;
-      var candidate = DateTime(now.year, now.month, monthDay);
+      final thisMonthDay = _clampedMonthDay(now.year, now.month, monthDay);
+      var candidate = DateTime(now.year, now.month, thisMonthDay);
       if (candidate.isBefore(today)) {
-        candidate = DateTime(now.year, now.month + 1, monthDay);
+        final nextMonth = DateTime(now.year, now.month + 1, 1);
+        final nextMonthDay =
+            _clampedMonthDay(nextMonth.year, nextMonth.month, monthDay);
+        candidate =
+            DateTime(nextMonth.year, nextMonth.month, nextMonthDay);
       }
       return candidate;
 
     case 'interval':
-      final intervalDays = routine['interval_days'] ?? 1;
+      final intervalDays = _parseIntervalDays(routine['interval_days']);
       if (lastDone != null) {
-        final lastDoneDay =
-            DateTime(lastDone.year, lastDone.month, lastDone.day);
+        final lastDoneDay = _dateOnly(lastDone);
         final next = lastDoneDay.add(Duration(days: intervalDays));
         return next.isBefore(today) ? today : next;
       }
-      final startDateStr = routine['start_date'];
-      final startDate =
-          startDateStr != null ? DateTime.parse(startDateStr) : today;
-      return startDate.isBefore(today) ? today : startDate;
+      final startDate = _tryParseDate(routine['start_date']);
+      if (startDate == null) return today;
+      final startDay = _dateOnly(startDate);
+      return startDay.isBefore(today) ? today : startDay;
 
     case 'once':
       return lastDone == null ? today : null;
