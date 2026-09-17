@@ -39,74 +39,76 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     _loadTodayTasks();
   }
 
-  Future<void> _loadTodayTasks() async {
+    Future<void> _loadTodayTasks() async {
     if (mounted) {
       setState(() => _isLoading = true);
     }
 
     try {
-      final userId =
-          Supabase.instance.client.auth.currentUser!.id;
+      // ۱. بررسی کاملاً ایمن کاربر بدون عملگر !
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        if (mounted) {
+          setState(() {
+            _pets = [];
+            _tasks = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
-      final petsResponse = await Supabase.instance.client
+      final userId = user.id;
+
+      final petsRes = await Supabase.instance.client
           .from('pets')
           .select()
-          .eq('user_id', userId);
+          .eq('user_id', userId)
+          .order('created_at', ascending: true);
 
-      final routinesResponse = await Supabase.instance.client
+      final routinesRes = await Supabase.instance.client
           .from('routines')
           .select()
           .eq('user_id', userId)
           .eq('is_active', true);
 
-      final completionsResponse =
-          await Supabase.instance.client
-              .from('completions')
-              .select()
-              .eq('user_id', userId);
+      final completionsRes = await Supabase.instance.client
+          .from('completions')
+          .select()
+          .eq('user_id', userId);
 
-      final pets =
-          List<Map<String, dynamic>>.from(petsResponse);
-
-      final routines =
-          List<Map<String, dynamic>>.from(routinesResponse);
-
+      final pets = List<Map<String, dynamic>>.from(petsRes);
+      final routines = List<Map<String, dynamic>>.from(routinesRes);
       final allCompletions =
-          List<Map<String, dynamic>>.from(
-        completionsResponse,
-      );
+          List<Map<String, dynamic>>.from(completionsRes);
 
       final List<_TodayTask> tasks = [];
 
       for (final routine in routines) {
-        final petIds =
-            List<dynamic>.from(routine['pet_ids'] ?? []);
+        final rawPetIds = routine['pet_ids'];
+        final petIds = rawPetIds is List ? List<dynamic>.from(rawPetIds) : [];
 
         for (final petId in petIds) {
-          final petIndex = pets.indexWhere(
-            (pet) => pet['id'].toString() == petId.toString(),
+          final pet = pets.firstWhere(
+            (p) => p['id']?.toString() == petId?.toString(),
+            orElse: () => {},
           );
 
-          if (petIndex == -1) continue;
+          if (pet.isEmpty) continue;
 
-          final pet = pets[petIndex];
+          final petCompletions = allCompletions.where((c) {
+            return c['routine_id']?.toString() == routine['id']?.toString() &&
+                c['pet_id']?.toString() == petId?.toString();
+          }).toList();
 
-          final petCompletions = allCompletions
-              .where(
-                (completion) =>
-                    completion['pet_id'].toString() ==
-                    petId.toString(),
-              )
-              .toList();
-
-          if (!isRelevantToday(
-            routine,
-            petCompletions,
-          )) {
+          if (!isRelevantToday(routine, petCompletions)) {
             continue;
           }
 
-          final done = isDoneToday(
+          final isDone = isDoneToday(routine, petCompletions);
+          final isSkipped = isSkippedToday(routine, petCompletions);
+
+                    final done = isDoneToday(
             routine,
             petCompletions,
           );
@@ -127,43 +129,44 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         }
       }
 
-      // مرتب‌سازی: اول کارهای باقی‌مانده،
-      // بعد انجام‌شده و در نهایت ردشده
+      // مرتب‌سازی: اول کارهای باقی‌مانده، بعد انجام‌شده و در نهایت ردشده
       tasks.sort((a, b) {
-        final aHandled = a.isDone || a.isSkipped;
-        final bHandled = b.isDone || b.isSkipped;
+        final aPending = !a.isDone && !a.isSkipped;
+        final bPending = !b.isDone && !b.isSkipped;
 
-        if (aHandled != bHandled) {
-          return aHandled ? 1 : -1;
-        }
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
 
-        final aTime =
-            a.routine['time']?.toString() ?? '';
-        final bTime =
-            b.routine['time']?.toString() ?? '';
+        final aTime = (a.routine['time'] ?? '00:00').toString();
+        final bTime = (b.routine['time'] ?? '00:00').toString();
 
         return aTime.compareTo(bTime);
       });
+
 
       if (!mounted) return;
 
       setState(() {
         _pets = pets;
         _tasks = tasks;
-        _isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
-
-      setState(() => _isLoading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا در دریافت کارهای امروز: $e'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در دریافت کارهای امروز: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      // ۲. تضمین قطعی خاموش شدن لودینگ در هر شرایطی
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   int get _remainingCount {
     return _tasks
@@ -209,25 +212,33 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     }
   }
 
-  Future<void> _respond(
+    Future<void> _respond(
     _TodayTask task,
     String status, {
     String? note,
   }) async {
-    final user =
-        Supabase.instance.client.auth.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
-    if (user == null) return;
+    // ۱. بررسی ایمن بدون علامت ! و اطلاع‌رسانی به کاربر در صورت لاگین نبودن
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
+            backgroundColor: _terracotta,
+          ),
+        );
+      }
+      return;
+    }
 
+    // ۲. مدیریت کلیه درخواست‌های دیتابیس (insert/select) و استیت داخل بلوک try/catch
     try {
-      await Supabase.instance.client
-          .from('completions')
-          .insert({
+      await Supabase.instance.client.from('completions').insert({
         'user_id': user.id,
         'routine_id': task.routine['id'],
         'pet_id': task.pet['id'],
-        'completed_at':
-            DateTime.now().toIso8601String(),
+        'completed_at': DateTime.now().toIso8601String(),
         'status': status,
         'note': note,
       });
@@ -244,57 +255,37 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         ),
       );
 
-      await NotificationService.cancelOverdueReminders(
-        task.routine['id'],
-      );
+      // لغو هشدارهای تأخیر
+      try {
+        await NotificationService.cancelOverdueReminders(task.routine['id']);
+      } catch (e) {
+        debugPrint('Error canceling overdue reminders: $e');
+      }
 
-      final repeatType =
-          task.routine['repeat_type'];
+      final repeatType = task.routine['repeat_type'];
 
-      if (repeatType == 'interval' ||
-          repeatType == 'once') {
-        final completionsResponse =
-            await Supabase.instance.client
-                .from('completions')
-                .select()
-                .eq('user_id', user.id)
-                .eq(
-                  'routine_id',
-                  task.routine['id'],
-                );
+      if (repeatType == 'interval' || repeatType == 'once') {
+        final completionsResponse = await Supabase.instance.client
+            .from('completions')
+            .select()
+            .eq('user_id', user.id)
+            .eq('routine_id', task.routine['id']);
 
-        final completions =
-            List<Map<String, dynamic>>.from(
-          completionsResponse,
-        );
+        final completions = List<Map<String, dynamic>>.from(completionsResponse);
 
         if (repeatType == 'once') {
-          await NotificationService
-              .cancelRoutineNotifications(
+          await NotificationService.cancelRoutineNotifications(
             task.routine['id'],
           );
         } else {
-          final next = nextDueDate(
-            task.routine,
-            completions,
-          );
-
-          final petIds = List.from(
-            task.routine['pet_ids'] ?? [],
-          );
-
+          final next = nextDueDate(task.routine, completions);
+          final petIds = List.from(task.routine['pet_ids'] ?? []);
           final petNames = _pets
-              .where(
-                (pet) => petIds.contains(pet['id']),
-              )
-              .map(
-                (pet) =>
-                    pet['name'] as String,
-              )
+              .where((pet) => petIds.contains(pet['id']))
+              .map((pet) => (pet['name'] ?? '').toString())
               .toList();
 
-          await NotificationService
-              .scheduleRoutineNotifications(
+          await NotificationService.scheduleRoutineNotifications(
             task.routine,
             overrideDate: next,
             petNames: petNames,
@@ -302,13 +293,14 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         }
       }
 
+      // به‌روزرسانی مجدد لیست کارها پس از ثبت موفق
       await _loadTodayTasks();
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('ثبت کار انجام نشد: $e'),
+          content: Text('ثبت وضعیت کار انجام نشد: $e'),
+          backgroundColor: _terracotta,
         ),
       );
     }
