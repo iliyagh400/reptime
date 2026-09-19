@@ -126,9 +126,21 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     });
   }
 
-  Future<void> _updateRoutine() async {
+    Future<void> _updateRoutine() async {
+    // ۱. گارد جلوگیری از کلیک‌های مکرر و ارسال تکراری
+    if (_isLoading) return;
+
     if (_selectedPetIds.isEmpty) {
       _showSnack('حداقل یک حیوون انتخاب کن');
+      return;
+    }
+
+    // ۲. بررسی ایمن کاربر جاری
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        _showSnack('کاربر وارد نشده است. لطفاً دوباره وارد شوید.', isError: true);
+      }
       return;
     }
 
@@ -155,66 +167,84 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
           .select()
           .single();
 
-      final petNames = widget.pets
-          .where((p) => _selectedPetIds.contains(p['id'].toString()))
-          .map((p) => p['name'] as String)
-          .toList();
-      await NotificationService.scheduleRoutineNotifications(
-        updated,
-        petNames: petNames,
-      );
+      // ۳ و ۴. استخراج امن نام حیوانات و اجرای مستقل نوتیفیکیشن
+      try {
+        final petNames = widget.pets
+            .where((p) => _selectedPetIds.contains(p['id'].toString()))
+            .map((p) => (p['name'] ?? '').toString())
+            .toList();
+
+        await NotificationService.scheduleRoutineNotifications(
+          updated,
+          petNames: petNames,
+        );
+      } catch (notifError) {
+        debugPrint('Error scheduling routine notifications: $notifError');
+      }
 
       if (mounted) {
         _showSnack('روتین بروزرسانی شد ✅');
         Navigator.pop(context);
       }
     } catch (e) {
+      debugPrint('Error updating routine: $e');
       if (mounted) {
         _showSnack('خطا: $e', isError: true);
       }
     } finally {
-      setState(() => _isLoading = false);
+      // ۵. گارد mounted قبل از تغییر وضعیت لودینگ
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  Future<void> _deleteRoutine() async {
+
+   Future<void> _deleteRoutine() async {
+    // ۱. گارد لودینگ برای جلوگیری از کلیک مجدد هنگام عملیات
+    if (_isLoading) return;
+
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: _surfaceRaised,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
         ),
         title: const Text(
           'حذف روتین',
-          textAlign: TextAlign.right,
           style: TextStyle(
-            fontWeight: FontWeight.w800,
+            fontFamily: 'Vazirmatn',
+            fontWeight: FontWeight.bold,
             color: _ink,
           ),
         ),
         content: const Text(
           'مطمئنی می‌خوای این روتین رو حذف کنی؟',
-          textAlign: TextAlign.right,
-          style: TextStyle(color: _muted, height: 1.6),
+          style: TextStyle(fontFamily: 'Vazirmatn', color: _muted),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text(
               'انصراف',
-              style: TextStyle(color: _muted, fontWeight: FontWeight.w600),
+              style: TextStyle(fontFamily: 'Vazirmatn', color: _muted),
             ),
           ),
           FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
               backgroundColor: _danger,
-              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'حذف',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontFamily: 'Vazirmatn',
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -222,6 +252,9 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     );
 
     if (confirm != true) return;
+    if (!mounted) return;
+
+    setState(() => _isLoading = true);
 
     try {
       await Supabase.instance.client
@@ -229,16 +262,31 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
           .delete()
           .eq('id', widget.routine['id']);
 
-      await NotificationService.cancelRoutineNotifications(
-          widget.routine['id']);
+      // ۲. بلوک مستقل لغو نوتیفیکیشن‌ها بعد از حذف موفق
+      try {
+        await NotificationService.cancelRoutineNotifications(
+          widget.routine['id'],
+        );
+      } catch (notifError) {
+        debugPrint('Error canceling routine notifications: $notifError');
+      }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
+      debugPrint('Error deleting routine: $e');
       if (mounted) {
         _showSnack('خطا: $e', isError: true);
       }
+    } finally {
+      // ۳. گارد mounted در صورت بروز خطا و بسته نشدن صفحه
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
