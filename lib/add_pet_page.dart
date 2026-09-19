@@ -106,55 +106,58 @@ class _AddPetPageState extends State<AddPetPage> {
     _ageController.text = _calculateAge(_birthDate!);
   }
 
-  Future<void> _openPicker() async {
-  final result = await Navigator.push<SpeciesPickResult>(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const SpeciesPickerPage(),
-    ),
-  );
+     Future<void> _openPicker() async {
+    final result = await Navigator.push<SpeciesPickResult>(
+      context,
+      MaterialPageRoute(builder: (context) => const SpeciesPickerPage()),
+    );
 
-  if (result == null) return;
+    // گارد mounted جهت جلوگیری از خطاهای بعد از بستن صفحه
+    if (!mounted) return;
+    if (result == null) return;
 
-  setState(() {
-  if (result.isCustom && result.categoryName.isEmpty) {
-    // نوع و گونه کاملاً سفارشی
-    _isCustomSpecies = true;
-    _selectedCategory = null;
-    _selectedCategoryEmoji = null;
-    _selectedSpeciesImage = null;
-    _breedController.clear();
-  } else if (result.isCustom) {
-    // دسته مشخص است، اما گونه سفارشی است
-    _isCustomSpecies = false;
-    _selectedCategory = result.categoryName;
-    _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
-
-    // ✅ اصلاح شد: حالا به جای null، آیکون پیش‌فرض دسته را نمایش می‌دهیم
-    _selectedSpeciesImage = defaultImagePathForGroup(result.categoryName);
-    
-    _breedController.clear();
-  } else {
-    // گونه شناخته‌شده انتخاب شده است
-    _isCustomSpecies = false;
-    _selectedCategory = result.categoryName;
-    _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
-
-    _breedController.text = result.speciesName;
-
-    // پیدا کردن تصویر بر اساس نام گونه
-    _selectedSpeciesImage = imagePathForBreed(result.speciesName);
+    setState(() {
+      if (result.isCustom && result.categoryName.isEmpty) {
+        _isCustomSpecies = true;
+        _selectedCategory = null;
+        _selectedCategoryEmoji = null;
+        _selectedSpeciesImage = null;
+        _breedController.clear();
+      } else if (result.isCustom) {
+        _isCustomSpecies = false;
+        _selectedCategory = result.categoryName;
+        _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
+        _selectedSpeciesImage = defaultImagePathForGroup(result.categoryName);
+        _breedController.clear();
+      } else {
+        _isCustomSpecies = false;
+        _selectedCategory = result.categoryName;
+        _selectedCategoryEmoji = emojiForSpeciesGroup(result.categoryName);
+        _breedController.text = result.speciesName;
+        _selectedSpeciesImage = imagePathForBreed(result.speciesName);
+      }
+    });
   }
-});
-;
-}
 
 
-  Future<void> _savePet() async {
+
+
+    Future<void> _savePet() async {
+    if (_isLoading) return;
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        _showSnack('کاربر وارد نشده است. لطفاً دوباره وارد شوید.', isError: true);
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
     _updateBirthDate();
+
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final userId = user.id;
 
       await Supabase.instance.client.from('pets').insert({
         'user_id': userId,
@@ -166,8 +169,6 @@ class _AddPetPageState extends State<AddPetPage> {
         'age': _ageController.text.trim(),
         'weight': double.tryParse(_weightController.text.trim()),
         'birthDate': _birthDate?.toIso8601String(),
-        // 'ageYears': _selectedAgeYears,
-        // 'ageMonths': _selectedAgeMonths,
       });
 
       if (mounted) {
@@ -179,9 +180,12 @@ class _AddPetPageState extends State<AddPetPage> {
         _showSnack('خطا: $e', isError: true);
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -745,7 +749,7 @@ Widget build(BuildContext context) {
                 : SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _savePet,
+                      onPressed: _isLoading ? null : _savePet,
                       style: FilledButton.styleFrom(
                         backgroundColor: _terracotta,
                         foregroundColor: const Color(0xFF171B17),
