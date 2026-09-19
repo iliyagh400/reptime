@@ -67,124 +67,102 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
   }
 
-  Future<void> _loadRoutines() async {
-
+    Future<void> _loadRoutines() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
-    final userId = Supabase.instance.client.auth.currentUser!.id;
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
 
-    final petId = widget.pet['id'];
+      final userId = user.id;
+      final petId = widget.pet['id'];
+      final allPetsResponse = await Supabase.instance.client
+          .from('pets')
+          .select()
+          .eq('user_id', userId);
+      _allPets = List<Map<String, dynamic>>.from(allPetsResponse);
 
-    final allPetsResponse = await Supabase.instance.client
+      final routinesResponse = await Supabase.instance.client
+          .from('routines')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_active', true);
+      final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
+      final petRoutines = allRoutines.where((r) {
+        final ids = List.from(r['pet_ids'] ?? []);
+        return ids.contains(petId);
+      }).toList();
 
-        .from('pets')
+      final completionsResponse = await Supabase.instance.client
+          .from('completions')
+          .select()
+          .eq('user_id', userId)
+          .eq('pet_id', petId);
+      final completions = List<Map<String, dynamic>>.from(completionsResponse);
 
-        .select()
-
-        .eq('user_id', userId);
-
-    _allPets = List<Map<String, dynamic>>.from(allPetsResponse);
-
-    final routinesResponse = await Supabase.instance.client
-
-        .from('routines')
-
-        .select()
-
-        .eq('user_id', userId)
-
-        .eq('is_active', true);
-
-    final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
-
-    final petRoutines = allRoutines.where((r) {
-
-      final ids = List.from(r['pet_ids'] ?? []);
-
-      return ids.contains(petId);
-
-    }).toList();
-
-
-    final completionsResponse = await Supabase.instance.client
-
-        .from('completions')
-
-        .select()
-
-        .eq('user_id', userId)
-
-        .eq('pet_id', petId);
-
-    final completions = List<Map<String, dynamic>>.from(completionsResponse);
-
-    final List<Map<String, dynamic>> relevantToday = [];
-
-    for (final routine in petRoutines) {
-
-      if (isRelevantToday(routine, completions)) {
-
-        relevantToday.add({
-
-          ...routine,
-
-          'isDoneToday': isDoneToday(routine, completions),
-
-          'isSkippedToday': isSkippedToday(routine, completions),
-
-        });
-
+      final List<Map<String, dynamic>> relevantToday = [];
+      for (final routine in petRoutines) {
+        if (isRelevantToday(routine, completions)) {
+          relevantToday.add({
+            ...routine,
+            'isDoneToday': isDoneToday(routine, completions),
+            'isSkippedToday': isSkippedToday(routine, completions),
+          });
+        }
       }
 
+      if (!mounted) return;
+      setState(() => _routines = relevantToday);
+    } catch (e, stackTrace) {
+      debugPrint('Failed to load routines: $e\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('خطا در بارگذاری کارها')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
     }
-
-    setState(() {
-
-      _routines = relevantToday;
-
-      _isLoading = false;
-
-    });
-
   }
 
   Future<void> _loadLatestCheckin() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
 
-    final userId = Supabase.instance.client.auth.currentUser!.id;
+      final response = await Supabase.instance.client
+          .from('pet_checkins')
+          .select()
+          .eq('user_id', user.id)
+          .eq('pet_id', widget.pet['id'])
+          .order('checkin_date', ascending: false)
+          .limit(1);
+      final results = List<Map<String, dynamic>>.from(response);
 
-    final response = await Supabase.instance.client
-
-        .from('pet_checkins')
-
-        .select()
-
-        .eq('user_id', userId)
-
-        .eq('pet_id', widget.pet['id'])
-
-        .order('checkin_date', ascending: false)
-
-        .limit(1);
-
-    final results = List<Map<String, dynamic>>.from(response);
-
-    setState(() {
-
-      _latestCheckin = results.isEmpty ? null : results.first;
-
-    });
-
+      if (!mounted) return;
+      setState(() {
+        _latestCheckin = results.isEmpty ? null : results.first;
+      });
+    } catch (e, stackTrace) {
+      debugPrint('Failed to load latest check-in: $e\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('خطا در بارگذاری آخرین چک‌این')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   bool get _checkinIsOverdue {
-
-    if (_latestCheckin == null) return true;
-
-    final lastDate = DateTime.parse(_latestCheckin!['checkin_date']);
-
+    final rawDate = _latestCheckin?['checkin_date'];
+    final lastDate = DateTime.tryParse(rawDate?.toString() ?? '');
+    if (lastDate == null) return true;
     return DateTime.now().difference(lastDate).inDays >= 30;
-
   }
+
 
   Future<void> _openCheckinForm() async {
 
@@ -209,8 +187,24 @@ class _PetProfilePageState extends State<PetProfilePage> {
   }
 
   Future<void> _respond(Map<String, dynamic> routine, String status,
-      {String? note}) async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
+    {String? note}) async {
+  final user = Supabase.instance.client.auth.currentUser;
+
+  if (user == null) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
+      ),
+    );
+    return;
+  }
+
+  final userId = user.id;
+  final repeatType = routine['repeat_type'];
+  List<Map<String, dynamic>> completions = [];
+
+  try {
     await Supabase.instance.client.from('completions').insert({
       'user_id': userId,
       'routine_id': routine['id'],
@@ -219,41 +213,64 @@ class _PetProfilePageState extends State<PetProfilePage> {
       'status': status,
       'note': note,
     });
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
-        ),
-      );
-    }
-    await NotificationService.cancelOverdueReminders(routine['id']);
-    final repeatType = routine['repeat_type'];
+
     if (repeatType == 'interval' || repeatType == 'once') {
       final completionsResponse = await Supabase.instance.client
           .from('completions')
           .select()
           .eq('user_id', userId)
           .eq('routine_id', routine['id']);
-      final completions =
+
+      completions =
           List<Map<String, dynamic>>.from(completionsResponse);
-      if (repeatType == 'once') {
-        await NotificationService.cancelRoutineNotifications(routine['id']);
-      } else {
-        final next = nextDueDate(routine, completions);
-        final petIds = List.from(routine['pet_ids'] ?? []);
-        final petNames = _allPets
-            .where((p) => petIds.contains(p['id']))
-            .map((p) => p['name'] as String)
-            .toList();
-        await NotificationService.scheduleRoutineNotifications(
-          routine,
-          overrideDate: next,
-          petNames: petNames,
-        );
-      }
     }
-    _loadRoutines();
+  } catch (e) {
+    debugPrint('Error saving routine response: $e');
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('خطا در ثبت وضعیت: $e'),
+        backgroundColor: _terracotta,
+      ),
+    );
+    return;
   }
+
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
+    ),
+  );
+
+  try {
+    await NotificationService.cancelOverdueReminders(routine['id']);
+
+    if (repeatType == 'once') {
+      await NotificationService.cancelRoutineNotifications(routine['id']);
+    } else if (repeatType == 'interval') {
+      final next = nextDueDate(routine, completions);
+      final petIds = List.from(routine['pet_ids'] ?? []);
+
+      final petNames = _allPets
+          .where((p) => petIds.contains(p['id']))
+          .map((p) => (p['name'] ?? '').toString())
+          .toList();
+
+      await NotificationService.scheduleRoutineNotifications(
+        routine,
+        overrideDate: next,
+        petNames: petNames,
+      );
+    }
+  } catch (e) {
+    debugPrint('Error updating routine notifications: $e');
+  }
+
+  if (!mounted) return;
+  await _loadRoutines();
+}
 
   Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
     final noteController = TextEditingController();

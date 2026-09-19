@@ -132,16 +132,40 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
     });
   }
 
-  Future<void> _saveRoutine() async {
+    Future<void> _saveRoutine() async {
+    // ۱. جلوگیری از ارسال مجدد در صورت کلیک مکرر
+    if (_isLoading) return;
+
+    // ۲. اعتبارسنجی کامل ورودی‌ها
     if (_selectedPetIds.isEmpty) {
-      _showSnack('حداقل یک حیوون انتخاب کن');
+      _showSnack('حداقل یک حیوون انتخاب کن', isError: true);
+      return;
+    }
+
+    if (_repeatType == 'weekly' && _selectedWeekdays.isEmpty) {
+      _showSnack('لطفاً حداقل یک روز از هفته را انتخاب کنید', isError: true);
+      return;
+    }
+
+    if (_repeatType == 'interval') {
+      final intervalVal = int.tryParse(_intervalController.text.trim());
+      if (intervalVal == null || intervalVal <= 0) {
+        _showSnack('لطفاً بازه زمانی معتبر (بزرگتر از صفر) وارد کنید', isError: true);
+        return;
+      }
+    }
+
+    // ۳. بررسی ایمن کاربر جاری بدون علامت !
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      _showSnack('کاربر وارد نشده است. لطفاً مجدداً وارد شوید.', isError: true);
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final userId = user.id;
 
       final inserted = await Supabase.instance.client
           .from('routines')
@@ -162,27 +186,38 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
           .select()
           .single();
 
-      final petNames = widget.pets
-          .where((p) => _selectedPetIds.contains(p['id'].toString()))
-          .map((p) => p['name'] as String)
-          .toList();
-      await NotificationService.scheduleRoutineNotifications(
-        inserted,
-        petNames: petNames,
-      );
+      // ۴ و ۵. اجرای مستقل نوتیفیکیشن در try/catch مجزا با استخراج ایمن نام حیوانات
+      try {
+        final petNames = widget.pets
+            .where((p) => _selectedPetIds.contains(p['id'].toString()))
+            .map((p) => (p['name'] ?? '').toString())
+            .toList();
+
+        await NotificationService.scheduleRoutineNotifications(
+          inserted,
+          petNames: petNames,
+        );
+      } catch (notifError) {
+        debugPrint('Error scheduling routine notifications: $notifError');
+      }
 
       if (mounted) {
         _showSnack('روتین ذخیره شد ✅');
         Navigator.pop(context);
       }
     } catch (e) {
+      debugPrint('Error saving routine to database: $e');
       if (mounted) {
-        _showSnack('خطا: $e', isError: true);
+        _showSnack('خطا در ذخیره روتین: $e', isError: true);
       }
     } finally {
-      setState(() => _isLoading = false);
+      // ۶. گارد mounted جهت جلوگیری از خطای setState بعد از بسته شدن صفحه
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
