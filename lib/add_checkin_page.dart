@@ -35,15 +35,30 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
     }
   }
 
-  Future<void> _save() async {
+    Future<void> _save() async {
+    if (_isLoading) return;
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ابتدا باید وارد حساب کاربری خود شوید.'),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final weight = double.tryParse(_weightController.text.trim());
+      final sanitizedWeight =
+          _weightController.text.trim().replaceAll(',', '.');
+      final weight = double.tryParse(sanitizedWeight);
 
       await Supabase.instance.client.from('pet_checkins').insert({
-        'user_id': userId,
+        'user_id': user.id,
         'pet_id': widget.pet['id'],
         'weight': weight,
         'health_score': _healthScore,
@@ -70,13 +85,18 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          const SnackBar(
+            content: Text('خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.'),
+          ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   InputDecoration _inputDecoration({required String label, required IconData icon, String? hint}) => InputDecoration(labelText: label, hintText: hint, prefixIcon: Icon(icon,color:_muted,size:20), labelStyle: const TextStyle(color:_muted), hintStyle: const TextStyle(color:_muted), filled:true, fillColor:_surface, contentPadding: const EdgeInsets.symmetric(horizontal:16,vertical:16), border: OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:const BorderSide(color:_line)), enabledBorder: OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:const BorderSide(color:_line)), focusedBorder: OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:const BorderSide(color:_lightMoss,width:1.5)));
 
