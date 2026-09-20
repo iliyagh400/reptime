@@ -33,13 +33,16 @@ class _AddEventPageState extends State<AddEventPage> {
     'دستشویی کرد',
   ];
 
-  Future<void> _pickDate() async {
+    Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
+
+    if (!mounted) return;
+
     if (picked != null) {
       setState(() {
         _selectedDate = DateTime(
@@ -53,7 +56,10 @@ class _AddEventPageState extends State<AddEventPage> {
     }
   }
 
-  Future<void> _saveEvent() async {
+
+   Future<void> _saveEvent() async {
+    if (_isLoading) return;
+
     if (_descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('توضیح اتفاق رو بنویس')),
@@ -61,13 +67,23 @@ class _AddEventPageState extends State<AddEventPage> {
       return;
     }
 
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ابتدا باید وارد حساب کاربری خود شوید.'),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-
       await Supabase.instance.client.from('pet_events').insert({
-        'user_id': userId,
+        'user_id': user.id,
         'pet_id': widget.pet['id'],
         'description': _descriptionController.text.trim(),
         'event_date': _selectedDate.toIso8601String(),
@@ -82,13 +98,18 @@ class _AddEventPageState extends State<AddEventPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
+          const SnackBar(
+            content: Text('خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.'),
+          ),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   InputDecoration _inputDecoration() => InputDecoration(
     labelText: 'توضیح اتفاق',
