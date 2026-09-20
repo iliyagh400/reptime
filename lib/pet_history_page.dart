@@ -40,98 +40,141 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
     }
   }
 
-  Future<void> _loadHistory() async {
+       Future<void> _loadHistory() async {
     if (mounted) setState(() => _isLoading = true);
 
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) {
-        if (mounted) setState(() { _entries = []; _isLoading = false; });
+        if (mounted) {
+          setState(() {
+            _entries = [];
+            _isLoading = false;
+          });
+        }
         return;
       }
 
-      final userId = user.id;
+      // شناسایی pet id به صورت ایمن
       final petId = widget.pet['id'];
 
-      final routinesResponse = await Supabase.instance.client
-          .from('routines').select().eq('user_id', userId);
+      // ۱. دریافت لیست روتین‌ها
+      final routinesRes = await Supabase.instance.client
+          .from('routines')
+          .select()
+          .eq('user_id', user.id);
 
-      final routinesById = {
-        for (final r in List<Map<String, dynamic>>.from(routinesResponse))
-          r['id']: r
-      };
+      final routinesById = <dynamic, Map<String, dynamic>>{};
+      for (final r in (routinesRes as List)) {
+        routinesById[r['id']] = Map<String, dynamic>.from(r);
+      }
 
-      final completionsResponse = await Supabase.instance.client
-          .from('completions').select()
-          .eq('user_id', userId).eq('pet_id', petId);
+      // ۲. دریافت تکمیل روتین‌ها (نام جدول صحیح: routine_completions)
+      final completionsRes = await Supabase.instance.client
+          .from('completions')
+          .select()
+          .eq('user_id', user.id)
+          .eq('pet_id', petId)
+          .order('completed_at', ascending: false);
 
-      final eventsResponse = await Supabase.instance.client
-          .from('pet_events').select()
-          .eq('user_id', userId).eq('pet_id', petId);
+      // ۳. دریافت رویدادها
+      final eventsRes = await Supabase.instance.client
+          .from('pet_events')
+          .select()
+          .eq('user_id', user.id)
+          .eq('pet_id', petId)
+          .order('event_date', ascending: false);
 
-      final checkinsResponse = await Supabase.instance.client
-        .from('pet_checkins')
-        .select()
-        .eq('user_id', userId)
-        .eq('pet_id', petId);
-    final checkins = List<Map<String, dynamic>>.from(checkinsResponse);
+      // ۴. دریافت چک‌این‌ها
+      final checkinsRes = await Supabase.instance.client
+          .from('pet_checkins')
+          .select()
+          .eq('user_id', user.id)
+          .eq('pet_id', petId)
+          .order('checkin_date', ascending: false);
 
-      final merged = <Map<String, dynamic>>[];
+      final List<Map<String, dynamic>> list = [];
 
-      for (final c in List<Map<String, dynamic>>.from(completionsResponse)) {
+      // پردازش روتین‌های تکمیل یا رد شده
+      for (final c in (completionsRes as List)) {
+        final dateStr = c['completed_at']?.toString();
+        if (dateStr == null) continue;
+        final date = DateTime.tryParse(dateStr);
+        if (date == null) continue;
+
         final routine = routinesById[c['routine_id']];
+        final title = routine?['title']?.toString() ?? 'روتین حذف‌شده';
         final isDone = c['status'] == 'done';
-        final note = c['note'];
+        final note = c['note']?.toString();
 
-        merged.add({
-          'date': DateTime.parse(c['completed_at']),
+        list.add({
+          'date': date,
           'kind': isDone ? 'done' : 'skipped',
-          'title': routine?['title'] ?? 'روتین حذف‌شده',
+          'title': title,
           'subtitle': isDone
-              ? _typeLabel(routine?['type'])
-              : (note != null && (note as String).isNotEmpty
-                  ? 'رد شد · $note'
-                  : 'رد شد'),
+              ? (routine != null ? _typeLabel(routine['type']?.toString()) : null)
+              : (note != null && note.isNotEmpty ? 'رد شد · $note' : 'رد شد'),
         });
       }
 
-      for (final e in List<Map<String, dynamic>>.from(eventsResponse)) {
-        merged.add({
-          'date': DateTime.parse(e['event_date']),
+      // پردازش رویدادها
+      for (final ev in (eventsRes as List)) {
+        final dateStr = ev['event_date']?.toString();
+        if (dateStr == null) continue;
+        final date = DateTime.tryParse(dateStr);
+        if (date == null) continue;
+
+        list.add({
+          'date': date,
           'kind': 'event',
-          'title': e['description'] ?? '',
+          'title': ev['description']?.toString() ?? 'رویداد ثبت‌شده',
           'subtitle': 'ثبت دستی',
         });
       }
-      for (final c in checkins) {
-        final weight = c['weight'];
-        final health = c['health_score'];
-        final note = c['note'];
-        merged.add({
-          'date': DateTime.parse(c['checkin_date']),
+
+      // پردازش چک‌این‌ها
+      for (final ch in (checkinsRes as List)) {
+        final dateStr = ch['checkin_date']?.toString();
+        if (dateStr == null) continue;
+        final date = DateTime.tryParse(dateStr);
+        if (date == null) continue;
+
+        final weight = ch['weight'];
+        final score = ch['health_score'];
+        final note = ch['note']?.toString();
+
+        list.add({
+          'date': date,
           'kind': 'checkin',
-          'title': 'وزن: ${weight ?? '—'} گرم · سلامت: ${health ?? '—'}/10',
-          'subtitle': (note != null && (note as String).isNotEmpty)
-              ? note
-              : 'چک‌این ماهانه',
+          'title': 'وزن: ${weight != null ? '$weight گرم' : 'ثبت نشده'} · سلامت: ${score ?? '-'}/10',
+          'subtitle': note != null && note.isNotEmpty ? note : 'چک‌این دوره‌ای',
         });
-        } 
-      merged.sort((a, b) =>
-          (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+      }
+
+      // مرتب‌سازی کل تاریخچه بر اساس تاریخ نزولی
+      list.sort((a, b) {
+        final aDate = a['date'] as DateTime;
+        final bDate = b['date'] as DateTime;
+        return bDate.compareTo(aDate);
+      });
 
       if (mounted) {
         setState(() {
-          _entries = merged;
+          _entries = list;
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('History loading error: $e');
+      debugPrint('History stack: $stack');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در دریافت تاریخچه: $e',
-                textDirection: TextDirection.rtl),
+            content: Text(
+              'خطایی در دریافت تاریخچه رخ داد: $e',
+              style: const TextStyle(fontFamily: 'Vazirmatn'),
+            ),
             backgroundColor: _surfaceRaised,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -142,6 +185,9 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
       }
     }
   }
+
+
+
 
   String _dateLabel(DateTime date) {
     final now = DateTime.now();
@@ -172,7 +218,7 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
   Color _kindColor(String kind) {
       switch (kind) {
         case 'done':
-          return Color(0xFF91B66D);;
+          return Color(0xFF91B66D);
         case 'skipped':
           return _muted;
         case 'checkin':
