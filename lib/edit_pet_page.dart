@@ -223,6 +223,7 @@ class _EditPetPageState extends State<EditPetPage> {
       ),
     );
 
+    if (!mounted) return;
     if (result == null) return;
 
     setState(() {
@@ -251,31 +252,49 @@ class _EditPetPageState extends State<EditPetPage> {
     });
   }
 
-  Future<void> _updatePet() async {
+   Future<void> _updatePet() async {
     FocusScope.of(context).unfocus();
+
+    // استانداردسازی وزن و اعتبارسنجی
+    final rawWeight = _weightController.text.trim();
+    double? parsedWeight;
+    if (rawWeight.isNotEmpty) {
+      final normalized = rawWeight
+          .replaceAll('،', '.')
+          .replaceAll(',', '.');
+      parsedWeight = double.tryParse(normalized);
+      if (parsedWeight == null) {
+        _showSnack('لطفاً وزن معتبری وارد کنید', isError: true);
+        return;
+      }
+    }
 
     setState(() => _isLoading = true);
     _updateBirthDate();
 
+    final updateData = {
+      'name': _nameController.text.trim(),
+      'species_group': _finalSpeciesGroup,
+      'breed': _breedController.text.trim(),
+      'gender': _selectedGender,
+      'age': _ageController.text.trim(),
+      'weight': parsedWeight,
+      'morph': _morphController.text.trim(),
+      'birthDate': _birthDate?.toIso8601String(),
+    };
+
     try {
-      await Supabase.instance.client.from('pets').update({
-        'name': _nameController.text.trim(),
-        'species_group': _finalSpeciesGroup,
-        'breed': _breedController.text.trim(),
-        'gender': _selectedGender,
-        'age': _ageController.text.trim(),
-        'weight': double.tryParse(_weightController.text.trim()),
-        'morph': _morphController.text.trim(),
-        'birthDate': _birthDate?.toIso8601String(),
-      }).eq('id', widget.pet['id']);
+      await Supabase.instance.client
+          .from('pets')
+          .update(updateData)
+          .eq('id', widget.pet['id']);
 
       if (!mounted) return;
-
       _showSnack('تغییرات ذخیره شد ✅');
       Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        _showSnack('خطا: $e', isError: true);
+        _showSnack('خطایی در به‌روزرسانی اطلاعات رخ داد. لطفاً دوباره تلاش کنید.', isError: true);
       }
     } finally {
       if (mounted) {
@@ -284,7 +303,10 @@ class _EditPetPageState extends State<EditPetPage> {
     }
   }
 
+
   Future<void> _deletePet() async {
+    if (_isLoading) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -337,10 +359,21 @@ class _EditPetPageState extends State<EditPetPage> {
     );
 
     if (confirm != true) return;
+    if (!mounted) return;
+
+    setState(() => _isLoading = true);
 
     try {
       final client = Supabase.instance.client;
-      final userId = client.auth.currentUser!.id;
+      final user = client.auth.currentUser;
+      if (user == null) {
+        if (mounted) {
+          _showSnack('خطا در احراز هویت. لطفاً دوباره وارد شوید.', isError: true);
+        }
+        return;
+      }
+
+      final userId = user.id;
       final petId = widget.pet['id'];
 
       final response = await client
@@ -394,7 +427,11 @@ class _EditPetPageState extends State<EditPetPage> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('خطا: $e', isError: true);
+        _showSnack('خطایی در حذف حیوان رخ داد. لطفاً دوباره تلاش کنید.', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
