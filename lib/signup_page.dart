@@ -274,27 +274,30 @@ class _SignupPageState extends State<SignupPage> {
               const SizedBox(height: 20),
               SizedBox(
                 height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pop(context); // بازگشت به صفحه لاگین
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _sand,
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    'رفتن به صفحه ورود',
-                    style: GoogleFonts.vazirmatn(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                    ),
+                child:               ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx); // بستن دیالوگ
+                  if (!mounted) return;
+                  Navigator.pop(context); // بازگشت به صفحه لاگین
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _sand,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
+                child: Text(
+                  'رفتن به صفحه ورود',
+                  style: GoogleFonts.vazirmatn(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
               ),
             ],
           ),
@@ -306,12 +309,13 @@ class _SignupPageState extends State<SignupPage> {
 
   // اعتبارسنجی فیلدها و ثبت‌نام
     // اعتبارسنجی فیلدها و ثبت‌نام کامل
-  Future<void> _signup() async {
+   Future<void> _signup() async {
+    if (_isLoading) return;
+
     final email = _emailController.text.trim().toLowerCase();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    // ریست ارورها
     setState(() {
       _emailError = null;
       _passwordError = null;
@@ -323,7 +327,7 @@ class _SignupPageState extends State<SignupPage> {
     if (email.isEmpty) {
       setState(() => _emailError = 'ایمیل را وارد کنید');
       hasError = true;
-    } else if (!RegExp(r'^[\w.\-+]+@([\w\-]+\.)+[a-zA-Z]{2,}$').hasMatch(email)) {
+    } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       setState(() => _emailError = 'فرمت ایمیل نامعتبر است');
       hasError = true;
     }
@@ -332,14 +336,14 @@ class _SignupPageState extends State<SignupPage> {
       setState(() => _passwordError = 'رمز عبور را وارد کنید');
       hasError = true;
     } else if (password.length < 6) {
-      setState(() => _passwordError = 'حداقل ۶ کاراکتر باشد');
+      setState(() => _passwordError = 'رمز عبور باید حداقل ۶ کاراکتر باشد');
       hasError = true;
     }
 
     if (confirmPassword.isEmpty) {
       setState(() => _confirmPasswordError = 'تکرار رمز عبور را وارد کنید');
       hasError = true;
-    } else if (password != confirmPassword) {
+    } else if (confirmPassword != password) {
       setState(() => _confirmPasswordError = 'تکرار رمز با رمز عبور همخوانی ندارد');
       hasError = true;
     }
@@ -350,7 +354,6 @@ class _SignupPageState extends State<SignupPage> {
 
     try {
       final isAllowed = await _checkEmailAllowed(email);
-
       if (!isAllowed) {
         if (!mounted) return;
         _showNoSubscriptionDialog();
@@ -365,40 +368,40 @@ class _SignupPageState extends State<SignupPage> {
       if (!mounted) return;
 
       if (res.user != null && res.session != null) {
-        // ثبت‌نام موفق + ورود مستقیم
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       } else if (res.user != null && res.session == null) {
-        // ثبت‌نام انجام شد اما نیاز به تایید ایمیل دارد
         _showGeneralMessage('حساب ساخته شد؛ لینک تأیید به ایمیل شما ارسال گردید.');
         Navigator.pop(context);
+      } else {
+        _showGeneralMessage(
+          'ثبت‌نام انجام نشد. لطفاً وضعیت اینترنت خود را بررسی کرده و مجدداً تلاش کنید.',
+        );
       }
     } on AuthException catch (e) {
       if (!mounted) return;
       final raw = e.message.toLowerCase();
-      
-      // تشخیص خطای ثبت‌نام تکراری
+
       if (raw.contains('already registered') || e.statusCode == '422') {
         setState(() => _emailError = 'این ایمیل قبلاً ثبت‌نام کرده است');
         _showAlreadyRegisteredDialog();
       } else if (raw.contains('password') && raw.contains('weak')) {
         setState(() => _passwordError = 'رمز عبور انتخاب شده ضعیف است');
       } else if (raw.contains('rate limit')) {
-        _showGeneralMessage('تعداد درخواست‌ها زیاد است؛ لطفاً کمی صبر کنید.');
+        _showGeneralMessage('تعداد درخواست‌ها زیاد است؛ لطفاً کمی بعد دوباره امتحان کنید.');
       } else {
-        _showGeneralMessage(e.message);
+        _showGeneralMessage('خطایی در فرایند ثبت‌نام رخ داد. لطفاً دوباره تلاش کنید.');
       }
-    } catch (e) {
-      _showGeneralMessage('خطایی در ثبت‌نام رخ داد. دوباره تلاش کنید.');
+    } catch (_) {
+      _showGeneralMessage('خطایی در فرایند ثبت‌نام رخ داد. دوباره تلاش کنید.');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
 
   // ویجت عنوان بالای هر ورودی به همراه پیام ارور اختصاصی
