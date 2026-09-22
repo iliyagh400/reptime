@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UpdatePasswordPage extends StatefulWidget {
@@ -16,7 +17,6 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  // اعتبارسنجی زنده
   bool get _hasMinLength => _newPasswordController.text.length >= 6;
   bool get _passwordsMatch =>
       _newPasswordController.text.isNotEmpty &&
@@ -31,52 +31,76 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
     super.dispose();
   }
 
-  Future<void> _updatePassword() async {
-    if (!_isFormValid) return;
+   Future<void> _updatePassword() async {
+    if (!_isFormValid || _isLoading) return;
 
     setState(() => _isLoading = true);
 
+    final supabase = Supabase.instance.client;
+
     try {
-      final supabase = Supabase.instance.client;
-      // به‌روزرسانی رمز عبور کاربر لاگین‌شده با توکن ریکاوری
       await supabase.auth.updateUser(
-        UserAttributes(password: _newPasswordController.text.trim()),
+        UserAttributes(password: _newPasswordController.text),
       );
 
       if (!mounted) return;
 
-      // نمایش پیام موفقیت
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password updated successfully! Please login with your new password.'),
-          backgroundColor: Color(0xFF10B981),
+        SnackBar(
+          content: Text(
+            'رمز عبور با موفقیت به‌روزرسانی شد. لطفاً وارد شوید.',
+            style: GoogleFonts.vazirmatn(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
 
-      // خروج از سشن موقت و هدایت به صفحه لاگین
-      await supabase.auth.signOut();
+      // خروج ایمن از نشست ریکاوری بدون متوقف شدن در صورت خطای شبکه
+      try {
+        await supabase.auth.signOut();
+      } catch (_) {}
+
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } on AuthException catch (error) {
+    } on AuthException catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error.message),
+          content: Text(
+            'خطایی در به‌روزرسانی رمز عبور رخ داد (ممکن است لینک منقضی شده باشد). لطفاً دوباره درخواست دهید.',
+            style: GoogleFonts.vazirmatn(color: Colors.white),
+          ),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('An unexpected error occurred. Please try again.'),
+        SnackBar(
+          content: Text(
+            'خطای غیرمنتظره‌ای رخ داد. لطفاً اتصال اینترنت را بررسی کرده و مجدداً تلاش کنید.',
+            style: GoogleFonts.vazirmatn(color: Colors.white),
+          ),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -91,137 +115,148 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'تغییر رمز عبور',
+          style: GoogleFonts.vazirmatn(
+            color: textLight,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: textLight),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: textLight, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Icon(
-                    Icons.lock_reset_rounded,
-                    size: 64,
-                    color: accentGreen,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(
+                  Icons.lock_reset_rounded,
+                  size: 64,
+                  color: accentGreen,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'رمز عبور جدید',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.vazirmatn(
+                    color: textLight,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Set New Password',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: textLight,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'لطفاً رمز عبور جدید خود را وارد کنید.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.vazirmatn(
+                    color: textMuted,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                TextField(
+                  controller: _newPasswordController,
+                  obscureText: _obscureNewPassword,
+                  style: GoogleFonts.vazirmatn(color: textLight, fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'رمز عبور جدید',
+                    labelStyle: GoogleFonts.vazirmatn(color: textMuted, fontSize: 13),
+                    hintText: 'حداقل ۶ کاراکتر',
+                    hintStyle: GoogleFonts.vazirmatn(color: textMuted.withValues(alpha: 0.5), fontSize: 12),
+                    prefixIcon: const Icon(Icons.lock_outline, color: textMuted, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
+                        color: textMuted,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscureNewPassword = !_obscureNewPassword),
+                    ),
+                    filled: true,
+                    fillColor: cardBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Enter your new password below to secure your account.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: textMuted),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // فیلد رمز عبور جدید
-                  const Text('New Password', style: TextStyle(color: textLight, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _newPasswordController,
-                    obscureText: _obscureNewPassword,
-                    style: const TextStyle(color: textLight),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: cardBg,
-                      hintText: 'At least 6 characters',
-                      hintStyle: const TextStyle(color: textMuted),
-                      prefixIcon: const Icon(Icons.lock_outline, color: textMuted),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
-                          color: textMuted,
-                        ),
-                        onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  style: GoogleFonts.vazirmatn(color: textLight, fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'تکرار رمز عبور جدید',
+                    labelStyle: GoogleFonts.vazirmatn(color: textMuted, fontSize: 13),
+                    hintText: 'رمز عبور جدید را دوباره وارد کنید',
+                    hintStyle: GoogleFonts.vazirmatn(color: textMuted.withValues(alpha: 0.5), fontSize: 12),
+                    prefixIcon: const Icon(Icons.lock_clock_outlined, color: textMuted, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        color: textMuted,
+                        size: 20,
                       ),
-                      border: OutlineInputBorder(
+                      onPressed: () => setState(
+                          () => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    ),
+                    filled: true,
+                    fillColor: cardBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 20),
+                _buildRequirementRow('حداقل ۶ کاراکتر', _hasMinLength),
+                const SizedBox(height: 8),
+                _buildRequirementRow('همخوانی رمزهای عبور', _passwordsMatch),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isFormValid && !_isLoading ? _updatePassword : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentGreen,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: accentGreen.withValues(alpha: 0.3),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
                       ),
+                      elevation: 0,
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // فیلد تکرار رمز عبور جدید
-                  const Text('Confirm New Password', style: TextStyle(color: textLight, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _confirmPasswordController,
-                    obscureText: _obscureConfirmPassword,
-                    style: const TextStyle(color: textLight),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: cardBg,
-                      hintText: 'Re-enter your new password',
-                      hintStyle: const TextStyle(color: textMuted),
-                      prefixIcon: const Icon(Icons.lock_clock_outlined, color: textMuted),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                          color: textMuted,
-                        ),
-                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // چک‌لیست اعتبارسنجی زنده
-                  _buildRequirementRow('At least 6 characters', _hasMinLength),
-                  const SizedBox(height: 6),
-                  _buildRequirementRow('Passwords match', _passwordsMatch),
-
-                  const SizedBox(height: 28),
-
-                  // دکمه تایید و ذخیره
-                  SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isFormValid && !_isLoading ? _updatePassword : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: accentGreen,
-                        disabledBackgroundColor: accentGreen.withValues(alpha: 0.3),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                            )
-                          : const Text(
-                              'Update Password',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
                             ),
-                    ),
+                          )
+                        : Text(
+                            'ثبت رمز جدید',
+                            style: GoogleFonts.vazirmatn(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -229,20 +264,20 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
     );
   }
 
-  Widget _buildRequirementRow(String text, bool isMet) {
+  Widget _buildRequirementRow(String text, bool met) {
     return Row(
       children: [
         Icon(
-          isMet ? Icons.check_circle : Icons.radio_button_unchecked,
-          size: 16,
-          color: isMet ? const Color(0xFF10B981) : const Color(0xFF64748B),
+          met ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+          color: met ? const Color(0xFF10B981) : const Color(0xFF64748B),
+          size: 18,
         ),
         const SizedBox(width: 8),
         Text(
           text,
-          style: TextStyle(
-            fontSize: 12,
-            color: isMet ? const Color(0xFFF8FAFC) : const Color(0xFF64748B),
+          style: GoogleFonts.vazirmatn(
+            color: met ? const Color(0xFFF8FAFC) : const Color(0xFF64748B),
+            fontSize: 12.5,
           ),
         ),
       ],
