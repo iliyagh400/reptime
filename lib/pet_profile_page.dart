@@ -42,6 +42,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
   bool _isLoading = true;
 
+  final Set<String> _processingKeys = {};
+
   // Reptime — Dark Terrarium palette
   static const _background = Color(0xFF141C17);
   static const _surface = Color(0xFF263229);
@@ -67,7 +69,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
   }
 
-    Future<void> _loadRoutines() async {
+      Future<void> _loadRoutines() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
@@ -91,7 +93,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
       final allRoutines = List<Map<String, dynamic>>.from(routinesResponse);
       final petRoutines = allRoutines.where((r) {
         final ids = List.from(r['pet_ids'] ?? []);
-        return ids.contains(petId);
+        return ids.map((id) => id.toString()).contains(petId.toString());
       }).toList();
 
       final completionsResponse = await Supabase.instance.client
@@ -121,12 +123,15 @@ class _PetProfilePageState extends State<PetProfilePage> {
         const SnackBar(content: Text('خطا در بارگذاری کارها')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  Future<void> _loadLatestCheckin() async {
+
+
+    Future<void> _loadLatestCheckin() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
@@ -151,10 +156,12 @@ class _PetProfilePageState extends State<PetProfilePage> {
         const SnackBar(content: Text('خطا در بارگذاری آخرین چک‌این')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
 
   bool get _checkinIsOverdue {
     final rawDate = _latestCheckin?['checkin_date'];
@@ -200,77 +207,94 @@ class _PetProfilePageState extends State<PetProfilePage> {
     return;
   }
 
+  final key = '${routine['id']}_${widget.pet['id']}';
+  if (_processingKeys.contains(key)) return;
+
+  _processingKeys.add(key);
+  if (mounted) {
+    setState(() {});
+  }
+
   final userId = user.id;
   final repeatType = routine['repeat_type'];
   List<Map<String, dynamic>> completions = [];
 
   try {
-    await Supabase.instance.client.from('completions').insert({
-      'user_id': userId,
-      'routine_id': routine['id'],
-      'pet_id': widget.pet['id'],
-      'completed_at': DateTime.now().toIso8601String(),
-      'status': status,
-      'note': note,
-    });
+    try {
+      await Supabase.instance.client.from('completions').insert({
+        'user_id': userId,
+        'routine_id': routine['id'],
+        'pet_id': widget.pet['id'],
+        'completed_at': DateTime.now().toIso8601String(),
+        'status': status,
+        'note': note,
+      });
 
-    if (repeatType == 'interval' || repeatType == 'once') {
-      final completionsResponse = await Supabase.instance.client
-          .from('completions')
-          .select()
-          .eq('user_id', userId)
-          .eq('routine_id', routine['id']);
+      if (repeatType == 'interval' || repeatType == 'once') {
+        final completionsResponse = await Supabase.instance.client
+            .from('completions')
+            .select()
+            .eq('user_id', userId)
+            .eq('routine_id', routine['id']);
 
-      completions =
-          List<Map<String, dynamic>>.from(completionsResponse);
+        completions =
+            List<Map<String, dynamic>>.from(completionsResponse);
+      }
+    } catch (e) {
+      debugPrint('Error saving routine response: $e');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('خطا در ثبت وضعیت. لطفاً دوباره تلاش کنید.'),
+          backgroundColor: _terracotta,
+        ),
+      );
+      return;
     }
-  } catch (e) {
-    debugPrint('Error saving routine response: $e');
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('خطا در ثبت وضعیت: $e'),
-        backgroundColor: _terracotta,
+        content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
       ),
     );
-    return;
-  }
 
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
-    ),
-  );
+    try {
+      await NotificationService.cancelOverdueReminders(routine['id']);
 
-  try {
-    await NotificationService.cancelOverdueReminders(routine['id']);
+      if (repeatType == 'once') {
+        await NotificationService.cancelRoutineNotifications(routine['id']);
+      } else if (repeatType == 'interval') {
+        final next = nextDueDate(routine, completions);
+        final petIds = List.from(routine['pet_ids'] ?? []);
 
-    if (repeatType == 'once') {
-      await NotificationService.cancelRoutineNotifications(routine['id']);
-    } else if (repeatType == 'interval') {
-      final next = nextDueDate(routine, completions);
-      final petIds = List.from(routine['pet_ids'] ?? []);
+        final petNames = _allPets
+            .where((p) => petIds.contains(p['id']))
+            .map((p) => (p['name'] ?? '').toString())
+            .toList();
 
-      final petNames = _allPets
-          .where((p) => petIds.contains(p['id']))
-          .map((p) => (p['name'] ?? '').toString())
-          .toList();
-
-      await NotificationService.scheduleRoutineNotifications(
-        routine,
-        overrideDate: next,
-        petNames: petNames,
-      );
+        await NotificationService.scheduleRoutineNotifications(
+          routine,
+          overrideDate: next,
+          petNames: petNames,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating routine notifications: $e');
     }
-  } catch (e) {
-    debugPrint('Error updating routine notifications: $e');
-  }
 
-  if (!mounted) return;
-  await _loadRoutines();
+    if (!mounted) return;
+    await _loadRoutines();
+  } finally {
+    if (mounted) {
+      setState(() {
+        _processingKeys.remove(key);
+      });
+    }
+  }
 }
+
 
   Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
     final noteController = TextEditingController();
@@ -853,7 +877,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
                             final skippedToday = r['isSkippedToday'] == true;
 
                             final type = r['type'] ?? 'other';
-
+                            final isBusy = _processingKeys.contains('${r['id']}_${widget.pet['id']}');
                             return Container(
 
                               margin: const EdgeInsets.symmetric(
@@ -1035,11 +1059,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
                                                 tooltip: 'رد کردن این بار',
 
-                                                onPressed: () =>
-
-                                                    _showSkipDialog(r),
-
-                                              ),
+                                                  onPressed: isBusy ? null : () => _showSkipDialog(r),),
 
                                               IconButton(
 
@@ -1051,12 +1071,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
                                                     0xFF6E8B52),
 
-                                                onPressed: () =>
-
-                                                    _respond(r, 'done'),
-
-                                              ),
-
+                                                  onPressed: isBusy ? null : () => _respond(r, 'done'),),
                                             ],
 
                                           ),
