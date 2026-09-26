@@ -11,6 +11,7 @@ class PetHistoryPage extends StatefulWidget {
 
 class _PetHistoryPageState extends State<PetHistoryPage> {
   bool _isLoading = true;
+  bool _isFetching = false;
   List<Map<String, dynamic>> _entries = [];
 
   static const _background = Color(0xFF141C17);
@@ -41,8 +42,9 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
   }
 
        Future<void> _loadHistory() async {
+         if (_isFetching) return;
+        _isFetching = true;
     if (mounted) setState(() => _isLoading = true);
-
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) {
@@ -164,16 +166,16 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
           _isLoading = false;
         });
       }
-    } catch (e, stack) {
+    }  catch (e, stack) {
       debugPrint('History loading error: $e');
       debugPrint('History stack: $stack');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'خطایی در دریافت تاریخچه رخ داد: $e',
-              style: const TextStyle(fontFamily: 'Vazirmatn'),
+            content: const Text(
+              'خطایی در دریافت تاریخچه رخ داد. لطفاً دوباره تلاش کنید.',
+              style: TextStyle(fontFamily: 'Vazirmatn'),
             ),
             backgroundColor: _surfaceRaised,
             behavior: SnackBarBehavior.floating,
@@ -183,8 +185,9 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
           ),
         );
       }
-    }
-  }
+    } finally {
+      _isFetching = false;
+    }}
 
 
 
