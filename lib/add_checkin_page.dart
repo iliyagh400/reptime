@@ -34,7 +34,12 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
       _weightController.text = currentWeight.toString();
     }
   }
-
+   @override
+   void dispose() {
+    _weightController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
     Future<void> _save() async {
     if (_isLoading) return;
 
@@ -83,6 +88,7 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
         Navigator.pop(context, true);
       }
     } catch (e) {
+      debugPrint('Error saving check-in: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
