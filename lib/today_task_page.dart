@@ -14,7 +14,7 @@ class TodayTasksPage extends StatefulWidget {
 class _TodayTasksPageState extends State<TodayTasksPage> {
   List<Map<String, dynamic>> _pets = [];
   List<_TodayTask> _tasks = [];
-
+  final Set<String> _processingKeys = {};
   bool _isLoading = true;
 
   // Reptime Dark Terrarium design system
@@ -105,9 +105,6 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
             continue;
           }
 
-          final isDone = isDoneToday(routine, petCompletions);
-          final isSkipped = isSkippedToday(routine, petCompletions);
-
                     final done = isDoneToday(
             routine,
             petCompletions,
@@ -151,14 +148,16 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         _tasks = tasks;
       });
     } catch (e) {
+     debugPrint('Error loading today tasks: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در دریافت کارهای امروز: $e'),
+            content: const Text('خطا در دریافت کارهای امروز'),
             backgroundColor: Colors.red.shade700,
           ),
         );
       }
+    
     } finally {
       // ۲. تضمین قطعی خاموش شدن لودینگ در هر شرایطی
       if (mounted) {
@@ -212,19 +211,18 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     }
   }
 
-    Future<void> _respond(
-    _TodayTask task,
-    String status, {
-    String? note,
-  }) async {
-    final user = Supabase.instance.client.auth.currentUser;
+        Future<void> _respond(_TodayTask task, String status, {String? note}) async {
+    final String processingKey = "${task.routine['id']}_${task.pet['id']}";
+    if (_processingKeys.contains(processingKey)) return;
+    _processingKeys.add(processingKey);
 
-    // ۱. بررسی ایمن بدون علامت ! و اطلاع‌رسانی به کاربر در صورت لاگین نبودن
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
+      _processingKeys.remove(processingKey);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
+          SnackBar(
+            content: const Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
             backgroundColor: _terracotta,
           ),
         );
@@ -232,7 +230,6 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       return;
     }
 
-    // ۲. مدیریت کلیه درخواست‌های دیتابیس (insert/select) و استیت داخل بلوک try/catch
     try {
       await Supabase.instance.client.from('completions').insert({
         'user_id': user.id,
@@ -240,71 +237,76 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         'pet_id': task.pet['id'],
         'completed_at': DateTime.now().toIso8601String(),
         'status': status,
-        'note': note,
+        if (note != null && note.isNotEmpty) 'note': note,
       });
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            status == 'done'
-                ? 'کار با موفقیت ثبت شد ✅'
-                : 'کار رد شد ⏭️',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status == 'done' ? 'کار با موفقیت ثبت شد ✅' : 'کار رد شد ⏭️',
+            ),
+            backgroundColor: _forest,
           ),
-        ),
-      );
+        );
+      }
 
-      // لغو هشدارهای تأخیر
+      // بخش مدیریت نوتیفیکیشن‌ها محصور در try/catch مجزا
       try {
         await NotificationService.cancelOverdueReminders(task.routine['id']);
-      } catch (e) {
-        debugPrint('Error canceling overdue reminders: $e');
-      }
 
-      final repeatType = task.routine['repeat_type'];
+        final repeatType = task.routine['repeat_type'];
+        if (repeatType == 'interval' || repeatType == 'once') {
+          final res = await Supabase.instance.client
+              .from('completions')
+              .select()
+              .eq('user_id', user.id)
+              .eq('routine_id', task.routine['id']);
+          final completions = List<Map<String, dynamic>>.from(res);
 
-      if (repeatType == 'interval' || repeatType == 'once') {
-        final completionsResponse = await Supabase.instance.client
-            .from('completions')
-            .select()
-            .eq('user_id', user.id)
-            .eq('routine_id', task.routine['id']);
+          if (repeatType == 'once') {
+            await NotificationService.cancelRoutineNotifications(task.routine['id']);
+          } else {
+            final next = nextDueDate(task.routine, completions);
+            final petIds = task.routine['pet_ids'] is List
+                ? List<String>.from(task.routine['pet_ids'])
+                : <String>[];
+            final petNames = petIds.map((id) {
+              final p = _pets.firstWhere(
+                (element) => element['id'] == id,
+                orElse: () => <String, dynamic>{},
+              );
+              return _petName(p);
+            }).toList();
 
-        final completions = List<Map<String, dynamic>>.from(completionsResponse);
-
-        if (repeatType == 'once') {
-          await NotificationService.cancelRoutineNotifications(
-            task.routine['id'],
-          );
-        } else {
-          final next = nextDueDate(task.routine, completions);
-          final petIds = List.from(task.routine['pet_ids'] ?? []);
-          final petNames = _pets
-              .where((pet) => petIds.contains(pet['id']))
-              .map((pet) => (pet['name'] ?? '').toString())
-              .toList();
-
-          await NotificationService.scheduleRoutineNotifications(
-            task.routine,
-            overrideDate: next,
-            petNames: petNames,
-          );
+            await NotificationService.scheduleRoutineNotifications(
+               task.routine,
+              petNames: petNames,
+              overrideDate: next,
+            );
+          }
         }
+      } catch (e) {
+        debugPrint('Error managing notifications: $e');
       }
 
-      // به‌روزرسانی مجدد لیست کارها پس از ثبت موفق
       await _loadTodayTasks();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('ثبت وضعیت کار انجام نشد: $e'),
-          backgroundColor: _terracotta,
-        ),
-      );
+      debugPrint('Error responding to task: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ثبت وضعیت کار انجام نشد'),
+            backgroundColor: _terracotta,
+          ),
+        );
+      }
+    } finally {
+      _processingKeys.remove(processingKey);
     }
   }
+
+
 
   Future<void> _markDone(_TodayTask task) async {
     await _respond(task, 'done');
@@ -444,8 +446,7 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: Colors.white
-                  .withOpacity(0.15),
+              color:_forest.withValues(alpha: 0.08),
               borderRadius:
                   BorderRadius.circular(17),
             ),
@@ -495,6 +496,8 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
   final done = task.isDone;
   final skipped = task.isSkipped;
   final handled = done || skipped;
+  final taskKey = "${task.routine['id']}_${task.pet['id']}";
+  final isProcessing = _processingKeys.contains(taskKey);
 
   return AnimatedOpacity(
     duration: const Duration(milliseconds: 250),
@@ -587,14 +590,12 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
                   icon: const Icon(Icons.close_rounded),
                   color: _muted,
                   tooltip: 'رد شد',
-                  onPressed: () => _showSkipDialog(task),
-                ),
+                  onPressed: isProcessing ? null : () => _showSkipDialog(task),),
                 IconButton(
                   icon: const Icon(Icons.check_circle_outline),
                   color: _terracotta,
                   tooltip: 'انجام شد',
-                  onPressed: () => _markDone(task),
-                ),
+                  onPressed: isProcessing ? null : () => _markDone(task),),
               ],
             ),
         ],
