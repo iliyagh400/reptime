@@ -55,7 +55,11 @@ class _AddEventPageState extends State<AddEventPage> {
       });
     }
   }
-
+   @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
    Future<void> _saveEvent() async {
     if (_isLoading) return;
@@ -96,13 +100,13 @@ class _AddEventPageState extends State<AddEventPage> {
         Navigator.pop(context);
       }
     } catch (e) {
+      debugPrint('Error saving event: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.'),
           ),
-        );
-      }
+        );}
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
