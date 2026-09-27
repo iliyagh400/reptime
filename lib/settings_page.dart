@@ -33,16 +33,27 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadSettings();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _onTimeReminders = prefs.getBool('on_time_reminders') ?? true;
-      _overdueReminders = prefs.getBool('overdue_reminders') ?? true;
-      _overdueIntervalHours = prefs.getInt('overdue_interval_hours') ?? 1;
-      _dailySummary = prefs.getBool('daily_summary') ?? false;
-      _isLoading = false;
-    });
+    Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+
+      setState(() {
+        _onTimeReminders = prefs.getBool('on_time_reminders') ?? true;
+        _overdueReminders = prefs.getBool('overdue_reminders') ?? true;
+        _overdueIntervalHours = prefs.getInt('overdue_interval_hours') ?? 1;
+        _dailySummary = prefs.getBool('daily_summary') ?? false;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
+
 
   // ویجت‌های استاندارد طراحی
   Widget _buildSectionLabel(String text) {
@@ -259,23 +270,21 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // این نسخه اصلاح شده بر اساس ساختار تابع شما در سرویس است
-Future<void> _refreshAllOverdueReminders() async {
-  try {
-    // فرض می‌کنیم لیست روتین‌ها را از جایی می‌خوانید
-    // اگر لیست را از قبل دارید، آن را مستقیماً اینجا قرار دهید
-    List<Map<String, dynamic>> routinesToProcess = []; 
-    
-    // گرفتن داده‌ها از سوپابیس (مثال)
-    // routinesToProcess = await supabase.from('routines').select()... 
+  Future<void> _refreshAllOverdueReminders() async {
+    try {
+      final routinesToProcess = await _loadActiveRoutines();
 
-    if (routinesToProcess.isNotEmpty) {
-      // فقط و فقط یک پارامتر می‌فرستیم: لیست روتین‌ها
-      await NotificationService.refreshOverdueReminders(routinesToProcess);
+      if (routinesToProcess.isNotEmpty) {
+        await NotificationService.refreshOverdueReminders(routinesToProcess);
+      }
+    } catch (e) {
+      debugPrint('Error: $e');
+      if (mounted) {
+        _showSnack('خطایی در به‌روزرسانی یادآورهای دیرشده رخ داد');
+      }
     }
-  } catch (e) {
-    debugPrint('Error: $e');
   }
-}
+
 
 
   void _showSnack(String message, {bool isError = false}) {

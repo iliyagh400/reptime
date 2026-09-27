@@ -633,11 +633,11 @@ class _LoginPageState extends State<LoginPage> {
 }
 
   // دیالوگ فراموشی رمز عبور
-  void _showForgotPasswordDialog() {
+    Future<void> _showForgotPasswordDialog() async {
     final resetEmailController = TextEditingController(text: _emailController.text);
     bool isSubmitting = false;
 
-    showDialog(
+    await showDialog(
       context: context,
       barrierColor: Colors.black87,
       builder: (ctx) => StatefulBuilder(
@@ -751,10 +751,13 @@ class _LoginPageState extends State<LoginPage> {
                             : () async {
                                 final email = resetEmailController.text.trim();
                                 if (email.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+                                  if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       backgroundColor: _errorRed,
-                                      content: Text('لطفاً یک ایمیل معتبر وارد کنید.', style: GoogleFonts.vazirmatn()),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      content: Text('لطفاً یک ایمیل معتبر وارد کنید.', style: GoogleFonts.vazirmatn(color: Colors.white)),
                                     ),
                                   );
                                   return;
@@ -770,25 +773,33 @@ class _LoginPageState extends State<LoginPage> {
 
                                   if (ctx.mounted) {
                                     Navigator.pop(ctx);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: _moss,
-                                        content: Text(
-                                          'لینک بازیابی به ایمیل شما ارسال شد. لطفاً صندوق ایمیل خود را بررسی کنید.',
-                                          style: GoogleFonts.vazirmatn(color: Colors.white),
-                                        ),
-                                      ),
-                                    );
                                   }
-                                } catch (e) {
-                                  if (ctx.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: _errorRed,
-                                        content: Text('خطا در ارسال ایمیل بازیابی: $e', style: GoogleFonts.vazirmatn()),
+
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: _moss,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      content: Text(
+                                        'لینک بازیابی به ایمیل شما ارسال شد. لطفاً صندوق ایمیل خود را بررسی کنید.',
+                                        style: GoogleFonts.vazirmatn(color: Colors.white),
                                       ),
-                                    );
-                                  }
+                                    ),
+                                  );
+                                } catch (_) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: _errorRed,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      content: Text(
+                                        'ارسال لینک بازیابی با خطا مواجه شد. لطفاً اتصال اینترنت خود را بررسی کنید.',
+                                        style: GoogleFonts.vazirmatn(color: Colors.white),
+                                      ),
+                                    ),
+                                  );
                                 } finally {
                                   if (ctx.mounted) {
                                     setDialogState(() => isSubmitting = false);
@@ -822,9 +833,15 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+
+    // آزادسازی کنترلر بعد از بسته‌شدن قطعی دیالوگ جهت جلوگیری از نشت حافظه
+    resetEmailController.dispose();
   }
 
+
     Future<void> _login() async {
+    if (_isLoading) return;
+
     FocusScope.of(context).unfocus();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -870,33 +887,28 @@ class _LoginPageState extends State<LoginPage> {
       if (!isAllowed) {
         // خارج کردن از اکانت تا یوزر اشتراک‌نداشت وارد نشود
         await Supabase.instance.client.auth.signOut();
+        if (!mounted) return;
         _showNoSubscriptionDialog(context);
         return;
       }
 
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
-    } on AuthException catch (e) {
+    }     on AuthException catch (e) {
       if (!mounted) return;
       final raw = e.message.toLowerCase();
 
       // نمایش خطاهای احراز هویت بالای فیلدها، مثل ساین‌آپ
-     if (raw.contains('invalid login credentials') ||
-    raw.contains('invalid credentials')) {
-  final exists = await _userExists(email);
-
-  if (!mounted) return;
-      setState(() {
-        if (exists) {
+      if (raw.contains('invalid login credentials') ||
+          raw.contains('invalid credentials')) {
+        if (!mounted) return;
+        setState(() {
           _emailError = null;
-          _passwordError = 'رمز عبور اشتباه است.';
-        } else {
-          _emailError = 'کاربری با این ایمیل یافت نشد.';
-          _passwordError = null;
-        }
-      });
+          _passwordError = 'ایمیل یا رمز عبور اشتباه است.';
+        });
       } else if (raw.contains('email not confirmed')) {
         setState(() => _emailError = 'ایمیل شما هنوز تایید نشده است.');
       } else if (raw.contains('invalid email')) {
@@ -905,7 +917,7 @@ class _LoginPageState extends State<LoginPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'اطلاعات ورود یافت نشد.',
+              'خطایی در احراز هویت رخ داد. لطفاً مجدداً تلاش کنید.',
               style: GoogleFonts.vazirmatn(color: Colors.white),
             ),
             backgroundColor: _errorRed,
@@ -916,7 +928,8 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       }
-    } catch (_) {
+    }
+catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -936,6 +949,8 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+
 
 
   Widget _buildFieldHeader(String label, String? errorText) {

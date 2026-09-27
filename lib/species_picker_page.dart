@@ -66,9 +66,13 @@ class _SpeciesPickerPageState extends State<SpeciesPickerPage> {
         content.add(_customWithinCategoryTile(category.name));
       }
     } else {
+           String normalize(String text) =>
+          text.replaceAll('ي', 'ی').replaceAll('ك', 'ک').toLowerCase();
+
+      final q = normalize(query);
       final results = allSpeciesFlat().where((r) {
-        return r.species.label.contains(query) ||
-            r.categoryName.contains(query);
+        return normalize(r.species.label).contains(q) ||
+            normalize(r.categoryName).contains(q);
       }).toList();
 
       if (results.isEmpty) {

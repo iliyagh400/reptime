@@ -13,15 +13,26 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
 
-  await Supabase.initialize(
-    url: 'https://psxcktkkrgtzudpcwiei.supabase.co',
-    anonKey: 'sb_publishable_lK-ZFUm1Ni8Ax8aM93m0jg_Tx_225Uc',
-  );
+  try {
+    await NotificationService.init();
+  } catch (e) {
+    debugPrint('NotificationService init error: $e');
+  }
+
+  try {
+    await Supabase.initialize(
+      url: 'https://psxcktkkrgtzudpcwiei.supabase.co',
+      publishableKey: 'GAPGPTMASKTOKENohquniy7eqqX0X',
+    );
+  } catch (e) {
+    debugPrint('Supabase init error: $e');
+  }
 
   runApp(const MyApp());
 }
+
+
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
