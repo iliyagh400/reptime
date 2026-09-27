@@ -134,12 +134,14 @@ String emojiForSpeciesGroup(String? speciesGroup) {
 
 
 String? imagePathForBreed(String? breed, {String? speciesGroup}) {
-  if (breed == null || breed.trim().isEmpty) return null;
+  if (breed == null) return null;
+  final cleanBreed = breed.trim();
+  if (cleanBreed.isEmpty) return null;
 
   // جستجوی دقیق در لیست گونه‌های شناخته‌شده
   for (final category in speciesCategories) {
     for (final species in category.species) {
-      if (species.label == breed) {
+      if (species.label == cleanBreed) {
         return '$speciesImageFolder/${species.assetKey}.png';
       }
     }
@@ -148,6 +150,7 @@ String? imagePathForBreed(String? breed, {String? speciesGroup}) {
   // breed ناشناخته یا «دیگر» → آیکون پیش‌فرض گروه
   return _defaultAssetForGroup(speciesGroup);
 }
+
 
 String? _defaultAssetForGroup(String? speciesGroup) {
   if (speciesGroup == null) return null;
