@@ -31,7 +31,8 @@ class _FadeSlideInState extends State<FadeSlideIn>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    final delay = Duration(milliseconds: 40 * widget.index);
+    final delayMs = (40 * widget.index).clamp(0, 400);
+    final delay = Duration(milliseconds: delayMs);
     Future.delayed(delay, () {
       if (mounted) _controller.forward();
     });
