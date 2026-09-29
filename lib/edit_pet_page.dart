@@ -251,57 +251,93 @@ class _EditPetPageState extends State<EditPetPage> {
       }
     });
   }
+  String _normalizeDigitsAndDecimals(String input) {
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+  var result = input.trim();
+  for (int i = 0; i < 10; i++) {
+    result = result.replaceAll(persianDigits[i], i.toString());
+    result = result.replaceAll(arabicDigits[i], i.toString());
+  }
+  return result.replaceAll('،', '.').replaceAll(',', '.');
+}
 
    Future<void> _updatePet() async {
-    FocusScope.of(context).unfocus();
+  FocusScope.of(context).unfocus();
 
-    // استانداردسازی وزن و اعتبارسنجی
-    final rawWeight = _weightController.text.trim();
-    double? parsedWeight;
-    if (rawWeight.isNotEmpty) {
-      final normalized = rawWeight
-          .replaceAll('،', '.')
-          .replaceAll(',', '.');
-      parsedWeight = double.tryParse(normalized);
-      if (parsedWeight == null) {
-        _showSnack('لطفاً وزن معتبری وارد کنید', isError: true);
-        return;
-      }
+  // ۱. اعتبارسنجی نام پت
+  final petName = _nameController.text.trim();
+  if (petName.isEmpty) {
+    _showSnack('نام پت نمی‌تواند خالی باشد', isError: true);
+    return;
+  }
+
+  // ۲. بررسی نشست کاربر و احراز هویت
+  final client = Supabase.instance.client;
+  final user = client.auth.currentUser;
+  if (user == null) {
+    if (mounted) {
+      _showSnack('خطا در احراز هویت. لطفاً دوباره وارد شوید.', isError: true);
     }
+    return;
+  }
 
-    setState(() => _isLoading = true);
-    _updateBirthDate();
-
-    final updateData = {
-      'name': _nameController.text.trim(),
-      'species_group': _finalSpeciesGroup,
-      'breed': _breedController.text.trim(),
-      'gender': _selectedGender,
-      'age': _ageController.text.trim(),
-      'weight': parsedWeight,
-      'morph': _morphController.text.trim(),
-      'birthDate': _birthDate?.toIso8601String(),
-    };
-
-    try {
-      await Supabase.instance.client
-          .from('pets')
-          .update(updateData)
-          .eq('id', widget.pet['id']);
-
-      if (!mounted) return;
-      _showSnack('تغییرات ذخیره شد ✅');
-      Navigator.pop(context);
-    } catch (e) {
-      if (mounted) {
-        _showSnack('خطایی در به‌روزرسانی اطلاعات رخ داد. لطفاً دوباره تلاش کنید.', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  // ۳. نرمال‌سازی وزن (تبدیل ارقام فارسی/عربی و ممیزها)
+  final rawWeight = _weightController.text.trim();
+  double? parsedWeight;
+  if (rawWeight.isNotEmpty) {
+    final normalized = _normalizeDigitsAndDecimals(rawWeight);
+    parsedWeight = double.tryParse(normalized);
+    if (parsedWeight == null) {
+      _showSnack('لطفاً وزن معتبری وارد کنید', isError: true);
+      return;
     }
   }
+
+  setState(() => _isLoading = true);
+
+  // ۴. جلوگیری از انحراف تاریخ تولد (Birthdate Drift):
+  // تنها در صورتی تاریخ تولد مجدداً از سن محاسبه می‌شود که کاربر مقدار جدیدی برای آن وارد کرده و تاریخ از قبل موجود نبوده باشد.
+  if (_birthDate == null && (_selectedAgeYears > 0 || _selectedAgeMonths > 0)) {
+    _updateBirthDate();
+  }
+
+  // حفظ کلید معتبر قبلی در صورت عدم تغییر
+  final existingBirthDate = widget.pet['birthDate'] ?? widget.pet['birth_date'];
+  final birthDateValue = _birthDate?.toIso8601String() ?? existingBirthDate?.toString();
+  final updateData = {
+    'name': petName,
+    'species_group': _finalSpeciesGroup,
+    'breed': _breedController.text.trim(),
+    'gender': _selectedGender,
+    'age': _ageController.text.trim(),
+    'weight': parsedWeight,
+    'morph': _morphController.text.trim(),
+    'birthDate': birthDateValue,
+  };
+
+  try {
+    await client
+        .from('pets')
+        .update(updateData)
+        .eq('id', widget.pet['id'])
+        .eq('user_id', user.id); // امنیت و بررسی مالکیت رکورد
+
+    if (!mounted) return;
+    _showSnack('تغییرات ذخیره شد ✅');
+    Navigator.pop(context);
+  } catch (e) {
+    if (mounted) {
+      _showSnack('خطایی در به‌روزرسانی اطلاعات رخ داد. لطفاً دوباره تلاش کنید.', isError: true);
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+}
+
 
 
   Future<void> _deletePet() async {
@@ -407,15 +443,17 @@ class _EditPetPageState extends State<EditPetPage> {
         }
       }
 
-      await client
-          .from('completions')
-          .delete()
-          .eq('pet_id', petId);
+       await client
+      .from('completions')
+      .delete()
+      .eq('pet_id', petId)
+      .eq('user_id', userId);
 
       await client
-          .from('pet_events')
-          .delete()
-          .eq('pet_id', petId);
+      .from('pets')
+      .delete()
+      .eq('id', petId)
+      .eq('user_id', userId);
 
       await client
           .from('pets')
