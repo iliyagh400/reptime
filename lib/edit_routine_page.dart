@@ -126,9 +126,15 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     });
   }
 
-    Future<void> _updateRoutine() async {
+      Future<void> _updateRoutine() async {
     // ۱. گارد جلوگیری از کلیک‌های مکرر و ارسال تکراری
     if (_isLoading) return;
+
+    // اعتبارسنجی عنوان روتین
+    if (_titleController.text.trim().isEmpty) {
+      _showSnack('لطفاً عنوان روتین را وارد کنید', isError: true);
+      return;
+    }
 
     if (_selectedPetIds.isEmpty) {
       _showSnack('حداقل یک حیوون انتخاب کن');
@@ -164,6 +170,7 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
                 : null,
           })
           .eq('id', widget.routine['id'])
+          .eq('user_id', user.id)
           .select()
           .single();
 
@@ -189,7 +196,7 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     } catch (e) {
       debugPrint('Error updating routine: $e');
       if (mounted) {
-        _showSnack('خطا: $e', isError: true);
+        _showSnack('خطا در بروزرسانی روتین. لطفاً دوباره تلاش کنید.', isError: true);
       }
     } finally {
       // ۵. گارد mounted قبل از تغییر وضعیت لودینگ
@@ -199,10 +206,18 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     }
   }
 
-
-   Future<void> _deleteRoutine() async {
+  Future<void> _deleteRoutine() async {
     // ۱. گارد لودینگ برای جلوگیری از کلیک مجدد هنگام عملیات
     if (_isLoading) return;
+
+    // بررسی نشست لاگین قبل از نمایش دیالوگ و کوئری
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        _showSnack('کاربر وارد نشده است. لطفاً دوباره وارد شوید.', isError: true);
+      }
+      return;
+    }
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -260,7 +275,8 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
       await Supabase.instance.client
           .from('routines')
           .delete()
-          .eq('id', widget.routine['id']);
+          .eq('id', widget.routine['id'])
+          .eq('user_id', user.id);
 
       // ۲. بلوک مستقل لغو نوتیفیکیشن‌ها بعد از حذف موفق
       try {
@@ -277,7 +293,7 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     } catch (e) {
       debugPrint('Error deleting routine: $e');
       if (mounted) {
-        _showSnack('خطا: $e', isError: true);
+        _showSnack('خطا در حذف روتین. لطفاً دوباره تلاش کنید.', isError: true);
       }
     } finally {
       // ۳. گارد mounted در صورت بروز خطا و بسته نشدن صفحه
