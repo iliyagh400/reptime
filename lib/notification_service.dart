@@ -187,12 +187,12 @@ class NotificationService {
   /// Weekly routines use baseId + weekday number (1-7) since each weekday
   /// needs its own scheduled entry.
   /// Returns null if routineId cannot be parsed to prevent collisions on ID 100000.
-  static int? _baseIdForRoutine(dynamic routineId) {
+   static int? _baseIdForRoutine(dynamic routineId) {
     if (routineId == null) return null;
     final idInt =
         routineId is int ? routineId : int.tryParse(routineId.toString());
     if (idInt == null) return null;
-    return 100000 + (idInt * 10);
+    return 100000 + (idInt * 100);
   }
 
   static Future<void> cancelRoutineNotifications(dynamic routineId) async {
@@ -205,20 +205,17 @@ class NotificationService {
       await _notifications.cancel(id: baseId);
 
       for (int weekday = 1; weekday <= 7; weekday++) {
-        await _notifications.cancel(
-          id: baseId + weekday,
-        );
+        await _notifications.cancel(id: baseId + weekday);
       }
 
-      for (int k = 1; k <= 8; k++) {
-        await _notifications.cancel(
-          id: baseId + 50 + k,
-        );
+      for (int k = 1; k <= _maxOverdueReminders; k++) {
+        await _notifications.cancel(id: baseId + 50 + k);
       }
     } catch (e) {
-      // debugPrint('Cancel routine notifications error: $e');
+      debugPrint('[NotificationService] Cancel routine notifications error: $e');
     }
   }
+
 
   static tz.TZDateTime _nextInstanceOfWeekdayTime(
       int weekday, int hour, int minute) {
@@ -229,20 +226,51 @@ class NotificationService {
     return scheduled;
   }
 
-  static tz.TZDateTime _nextInstanceOfMonthDayTime(
-      int monthDay, int hour, int minute) {
-    final now = tz.TZDateTime.now(tz.local);
-    final safeDay = monthDay.clamp(1, 28);
-    var scheduled =
-        tz.TZDateTime(tz.local, now.year, now.month, safeDay, hour, minute);
-    if (scheduled.isBefore(now)) {
-      final nextMonth = now.month == 12 ? 1 : now.month + 1;
-      final nextYear = now.month == 12 ? now.year + 1 : now.year;
-      scheduled =
-          tz.TZDateTime(tz.local, nextYear, nextMonth, safeDay, hour, minute);
+    static tz.TZDateTime _nextInstanceOfMonthDayTime(
+    int monthDay,
+    int hour,
+    int minute,
+  ) {
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    final clampedTargetDay = monthDay.clamp(1, 31);
+
+    int maxDaysInMonth(int year, int month) {
+      return DateTime(year, month + 1, 0).day;
     }
+
+    int targetYear = now.year;
+    int targetMonth = now.month;
+
+    int effectiveDay = clampedTargetDay.clamp(1, maxDaysInMonth(targetYear, targetMonth));
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      targetYear,
+      targetMonth,
+      effectiveDay,
+      hour,
+      minute,
+    );
+
+    if (scheduled.isBefore(now)) {
+      targetMonth++;
+      if (targetMonth > 12) {
+        targetMonth = 1;
+        targetYear++;
+      }
+      effectiveDay = clampedTargetDay.clamp(1, maxDaysInMonth(targetYear, targetMonth));
+      scheduled = tz.TZDateTime(
+        tz.local,
+        targetYear,
+        targetMonth,
+        effectiveDay,
+        hour,
+        minute,
+      );
+    }
+
     return scheduled;
   }
+
 
   /// Schedules (or re-schedules) the real device notification(s) for a
   /// single routine, based on its repeat type. Call this any time a
