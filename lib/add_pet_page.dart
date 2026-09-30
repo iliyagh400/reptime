@@ -138,18 +138,52 @@ class _AddPetPageState extends State<AddPetPage> {
       }
     });
   }
+  String _normalizeDigitsAndDecimals(String input) {
+    var result = input.trim();
+    const Map<String, String> digits = {
+      '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+      '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+      '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+      '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+    };
+    digits.forEach((nonLatin, latin) {
+      result = result.replaceAll(nonLatin, latin);
+    });
+    result = result.replaceAll('،', '.').replaceAll(',', '.').replaceAll('/', '.');
+    return result;
+  }
 
 
 
 
-    Future<void> _savePet() async {
+     Future<void> _savePet() async {
     if (_isLoading) return;
+
+    final trimmedName = _nameController.text.trim();
+    if (trimmedName.isEmpty) {
+      _showSnack('لطفاً نام پت را وارد کنید.', isError: true);
+      return;
+    }
+
+    final rawWeight = _weightController.text.trim();
+    double? parsedWeight;
+    if (rawWeight.isNotEmpty) {
+      final normalized = _normalizeDigitsAndDecimals(rawWeight);
+      parsedWeight = double.tryParse(normalized);
+      if (parsedWeight == null || parsedWeight <= 0) {
+        _showSnack('لطفاً وزن معتبر و بزرگتر از صفر وارد کنید.', isError: true);
+        return;
+      }
+    }
+     final species = _finalSpeciesGroup.trim();
+    if (species.isEmpty) {
+      _showSnack('لطفاً گونه/دسته‌بندی پت را انتخاب کنید.', isError: true);
+      return;
+    }
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      if (mounted) {
-        _showSnack('کاربر وارد نشده است. لطفاً دوباره وارد شوید.', isError: true);
-      }
+      _showSnack('کاربر وارد نشده است. لطفاً ابتدا وارد حساب شوید.', isError: true);
       return;
     }
 
@@ -157,28 +191,25 @@ class _AddPetPageState extends State<AddPetPage> {
     _updateBirthDate();
 
     try {
-      final userId = user.id;
-
       await Supabase.instance.client.from('pets').insert({
-        'user_id': userId,
-        'name': _nameController.text.trim(),
+        'user_id': user.id,
+        'name': trimmedName,
         'species_group': _finalSpeciesGroup,
         'breed': _breedController.text.trim(),
         'morph': _morphController.text.trim(),
         'gender': _selectedGender,
         'age': _ageController.text.trim(),
-        'weight': double.tryParse(_weightController.text.trim()),
+        'weight': parsedWeight,
         'birthDate': _birthDate?.toIso8601String(),
       });
 
-      if (mounted) {
-        _showSnack('پت با موفقیت ذخیره شد ✅');
-        Navigator.pop(context);
-      }
+      if (!mounted) return;
+      _showSnack('پت با موفقیت ذخیره شد ✅');
+      Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        _showSnack('خطا: $e', isError: true);
-      }
+      debugPrint('Error inserting pet: $e');
+      if (!mounted) return;
+      _showSnack('خطا در ذخیره اطلاعات پت. لطفاً دوباره تلاش کنید.', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
