@@ -193,107 +193,114 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
   }
 
-  Future<void> _respond(Map<String, dynamic> routine, String status,
-    {String? note}) async {
-  final user = Supabase.instance.client.auth.currentUser;
-
-  if (user == null) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
-      ),
-    );
-    return;
-  }
-
-  final key = '${routine['id']}_${widget.pet['id']}';
-  if (_processingKeys.contains(key)) return;
-
-  _processingKeys.add(key);
-  if (mounted) {
-    setState(() {});
-  }
-
-  final userId = user.id;
-  final repeatType = routine['repeat_type'];
-  List<Map<String, dynamic>> completions = [];
-
-  try {
-    try {
-      await Supabase.instance.client.from('completions').insert({
-        'user_id': userId,
-        'routine_id': routine['id'],
-        'pet_id': widget.pet['id'],
-        'completed_at': DateTime.now().toIso8601String(),
-        'status': status,
-        'note': note,
-      });
-
-      if (repeatType == 'interval' || repeatType == 'once') {
-        final completionsResponse = await Supabase.instance.client
-            .from('completions')
-            .select()
-            .eq('user_id', userId)
-            .eq('routine_id', routine['id']);
-
-        completions =
-            List<Map<String, dynamic>>.from(completionsResponse);
-      }
-    } catch (e) {
-      debugPrint('Error saving routine response: $e');
-
+    Future<void> _respond(
+    Map<String, dynamic> routine,
+    String status, {
+    String? note,
+  }) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('خطا در ثبت وضعیت. لطفاً دوباره تلاش کنید.'),
-          backgroundColor: _terracotta,
+          content: Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
         ),
       );
       return;
     }
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
-      ),
-    );
+    final routineId = routine['id'];
+    final petId = widget.pet['id'];
+    final key = '${routineId}_$petId';
+    if (_processingKeys.contains(key)) return;
+
+    _processingKeys.add(key);
+    if (mounted) {
+      setState(() {});
+    }
+
+    final userId = user.id;
+    final repeatType = routine['repeat_type'];
+    List<Map<String, dynamic>> completions = [];
 
     try {
-      await NotificationService.cancelOverdueReminders(routine['id']);
+      // 1. ثبت وضعیت تکمیل روتین برای همین پت
+      await Supabase.instance.client.from('completions').insert({
+        'user_id': userId,
+        'routine_id': routineId,
+        'pet_id': petId,
+        'completed_at': DateTime.now().toIso8601String(),
+        'status': status,
+        'note': note,
+      });
 
-      if (repeatType == 'once') {
-        await NotificationService.cancelRoutineNotifications(routine['id']);
-      } else if (repeatType == 'interval') {
-        final next = nextDueDate(routine, completions);
-        final petIds = List.from(routine['pet_ids'] ?? []);
+      // 2. کوئری completions ایزوله‌شده بر اساس pet_id جهت محاسبه موعد بعدی
+      if (repeatType == 'interval' || repeatType == 'once') {
+        final completionsResponse = await Supabase.instance.client
+            .from('completions')
+            .select()
+            .eq('user_id', userId)
+            .eq('routine_id', routineId)
+            .eq('pet_id', petId)
+            .order('completed_at', ascending: false);
+        completions = List<Map<String, dynamic>>.from(completionsResponse);
+      }
 
-        final petNames = _allPets
-            .where((p) => petIds.contains(p['id']))
-            .map((p) => (p['name'] ?? '').toString())
-            .toList();
-
-        await NotificationService.scheduleRoutineNotifications(
-          routine,
-          overrideDate: next,
-          petNames: petNames,
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
+            duration: const Duration(seconds: 2),
+          ),
         );
       }
-    } catch (e) {
-      debugPrint('Error updating routine notifications: $e');
-    }
 
-    if (!mounted) return;
-    await _loadRoutines();
-  } finally {
-    if (mounted) {
-      setState(() {
-        _processingKeys.remove(key);
-      });
+      // 3. مدیریت ایمن نوتیفیکیشن‌ها بدون تداخل
+      try {
+        await NotificationService.cancelOverdueReminders(routineId);
+
+        if (repeatType == 'once') {
+          await NotificationService.cancelRoutineNotifications(routineId);
+        } else if (repeatType == 'interval') {
+          final next = nextDueDate(routine, completions);
+          final petIds = List.from(routine['pet_ids'] ?? []);
+          final petNames = _allPets
+              .where((p) => petIds.contains(p['id']))
+              .map((p) => (p['name'] ?? '').toString())
+              .toList();
+
+          await NotificationService.scheduleRoutineNotifications(
+            routine,
+            overrideDate: next,
+            petNames: petNames,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error updating routine notifications: $e');
+      }
+
+      if (mounted) {
+        await _loadRoutines();
+      }
+    } catch (e) {
+      debugPrint('Error saving routine response: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطا در ثبت وضعیت. لطفاً دوباره تلاش کنید.'),
+            backgroundColor: _terracotta,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _processingKeys.remove(key);
+        });
+      }
     }
   }
-}
+
 
 
   Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
