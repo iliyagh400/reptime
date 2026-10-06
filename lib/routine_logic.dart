@@ -72,15 +72,37 @@ bool _isRecordToday(Map<String, dynamic>? record, String status) {
 }
 
 bool isDoneToday(
-    Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
-  final record = _lastResponseRecord(completions, routine['id']);
-  return _isRecordToday(record, 'completed') || _isRecordToday(record, 'done');
+  Map<String, dynamic> routine,
+  List<Map<String, dynamic>> completions,
+) {
+  final routineId = routine['id']?.toString();
+  final now = DateTime.now();
+
+  // بررسی مستقیم آیا رکوردی برای این روتین در روز جاری ثبت شده است
+  return completions.any((c) {
+    if (c['routine_id']?.toString() != routineId) return false;
+    final status = c['status']?.toString();
+    if (status != 'completed' && status != 'done') return false;
+    final date = _tryParseDate(c['completed_at']);
+    if (date == null) return false;
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  });
 }
 
 bool isSkippedToday(
-    Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
-  final record = _lastResponseRecord(completions, routine['id']);
-  return _isRecordToday(record, 'skipped');
+  Map<String, dynamic> routine,
+  List<Map<String, dynamic>> completions,
+) {
+  final routineId = routine['id']?.toString();
+  final now = DateTime.now();
+
+  return completions.any((c) {
+    if (c['routine_id']?.toString() != routineId) return false;
+    if (c['status']?.toString() != 'skipped') return false;
+    final date = _tryParseDate(c['completed_at']);
+    if (date == null) return false;
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  });
 }
 
 /// True if the routine already got a response today, either done or

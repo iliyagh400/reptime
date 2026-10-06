@@ -235,7 +235,7 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         'user_id': user.id,
         'routine_id': task.routine['id'],
         'pet_id': task.pet['id'],
-        'completed_at': DateTime.now().toIso8601String(),
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
         'status': status,
         if (note != null && note.isNotEmpty) 'note': note,
       });

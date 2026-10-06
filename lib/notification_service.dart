@@ -10,7 +10,7 @@ class NotificationService {
   static bool _initialized = false;
   static bool get isInitialized => _initialized;
 
-  static Future<void> init() async {
+    static Future<void> init() async {
     // flutter_local_notifications scheduling APIs used by this service
     // are not supported on Flutter Web. Keep the rest of the app usable.
     if (kIsWeb) {
@@ -21,12 +21,12 @@ class NotificationService {
     try {
       tz_data.initializeTimeZones();
 
-      // خواندن امن تایم‌زون با فال‌بک به UTC در صورت بروز خطا
+      // خواندن امن تایم‌زون سازگار با flutter_timezone 5.x و نسخه های قبل
       try {
-        final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-        tz.setLocalLocation(
-          tz.getLocation(timezoneInfo.identifier),
-        );
+        final dynamic tzRes = await FlutterTimezone.getLocalTimezone();
+        final String timeZoneName =
+            (tzRes is String) ? tzRes : (tzRes?.identifier ?? 'UTC');
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
       } catch (_) {
         try {
           tz.setLocalLocation(tz.getLocation('UTC'));
@@ -53,13 +53,30 @@ class NotificationService {
         settings: initSettings,
       );
 
-      // درخواست مجوز در اندروید
       final androidImpl =
           _notifications.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
+      // ثبت صریح کانال نوتیفیکیشن در سیستم عامل اندروید
+      // این خط باعث می‌شود Reptime بلافاصله در تنظیمات سیستم اندروید ثبت شود
+      const AndroidNotificationChannel routineChannel = AndroidNotificationChannel(
+        'routine_channel',
+        'یادآور روتین',
+        description: 'کانال یادآوری روتین‌ها و کارهای روزانه پت‌ها',
+        importance: Importance.max,
+      );
+      await androidImpl?.createNotificationChannel(routineChannel);
+
+      // درخواست مجوز نوتیفیکیشن در اندروید ۱۳ به بعد
       await androidImpl?.requestNotificationsPermission();
-      await androidImpl?.requestExactAlarmsPermission();
+      // بررسی وضعیت مجوز آلارم دقیق؛ اگر خاموش بود صفحه تنظیمات را باز می‌کند
+      final bool canScheduleExact =
+          await androidImpl?.canScheduleExactNotifications() ?? true;
+
+      if (!canScheduleExact) {
+        await androidImpl?.requestExactAlarmsPermission();
+      }
+
 
       // درخواست مجوز در iOS با پشتیبانی دوطرفه (Darwin یا IOS سنتی)
       try {
@@ -79,6 +96,15 @@ class NotificationService {
       // debugPrint('NotificationService init error: $e');
     }
   }
+    static Future<AndroidScheduleMode> _getScheduleMode() async {
+    final androidImpl = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final canExact = await androidImpl?.canScheduleExactNotifications() ?? false;
+    return canExact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+  }
+
 
   static NotificationDetails _defaultDetails() {
     return const NotificationDetails(
@@ -131,13 +157,14 @@ class NotificationService {
     if (kIsWeb || !_initialized) return;
 
     try {
+      final scheduleMode = await _getScheduleMode();
       await _notifications.zonedSchedule(
         id: id,
         title: title,
         body: body,
         scheduledDate: _nextInstanceOfTime(hour, minute),
         notificationDetails: _defaultDetails(),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: scheduleMode,
         matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
@@ -307,13 +334,14 @@ class NotificationService {
 
       switch (repeatType) {
         case 'daily':
+          final scheduleMode = await _getScheduleMode();
           await _notifications.zonedSchedule(
             id: baseId,
             title: title,
             body: body,
             scheduledDate: _nextInstanceOfTime(hour, minute),
             notificationDetails: _defaultDetails(),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            androidScheduleMode: scheduleMode,
             matchDateTimeComponents: DateTimeComponents.time,
           );
           break;
@@ -333,7 +361,7 @@ class NotificationService {
           for (final dayStr in weekdays) {
             final weekdayNum = dayMap[dayStr.toString().toLowerCase()];
             if (weekdayNum == null) continue;
-
+            final scheduleMode = await _getScheduleMode();
             await _notifications.zonedSchedule(
               id: baseId + weekdayNum,
               title: title,
@@ -341,7 +369,7 @@ class NotificationService {
               scheduledDate:
                   _nextInstanceOfWeekdayTime(weekdayNum, hour, minute),
               notificationDetails: _defaultDetails(),
-              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              androidScheduleMode: scheduleMode,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
             );
           }
@@ -351,7 +379,7 @@ class NotificationService {
           final monthDay =
               int.tryParse(routine['month_day']?.toString() ?? '');
           if (monthDay == null) return;
-
+          final scheduleMode = await _getScheduleMode();
           await _notifications.zonedSchedule(
             id: baseId,
             title: title,
@@ -359,7 +387,7 @@ class NotificationService {
             scheduledDate:
                 _nextInstanceOfMonthDayTime(monthDay, hour, minute),
             notificationDetails: _defaultDetails(),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            androidScheduleMode: scheduleMode,
             matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
           );
           break;
@@ -383,14 +411,14 @@ class NotificationService {
           } else {
             scheduledDate = _nextInstanceOfTime(hour, minute);
           }
-
+          final scheduleMode = await _getScheduleMode();
           await _notifications.zonedSchedule(
             id: baseId,
             title: title,
             body: body,
             scheduledDate: scheduledDate,
             notificationDetails: _defaultDetails(),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            androidScheduleMode: scheduleMode,
           );
           break;
       }
@@ -413,14 +441,14 @@ class NotificationService {
       await _notifications.cancel(id: _dailySummaryId);
 
       if (!enabled) return;
-
+      final scheduleMode = await _getScheduleMode();
       await _notifications.zonedSchedule(
         id: _dailySummaryId,
         title: 'خلاصه کارهای امروز',
         body: 'یادت نره کارهای باقیمانده امروز رو چک کنی و تیک بزنی 🐾',
         scheduledDate: _nextInstanceOfTime(21, 0),
         notificationDetails: _defaultDetails(),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: scheduleMode,
         matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
@@ -486,14 +514,14 @@ class NotificationService {
 
           if (nudgeTime.day != now.day) break;
           if (nudgeTime.isBefore(now)) continue;
-
+          final scheduleMode = await _getScheduleMode();
           await _notifications.zonedSchedule(
             id: baseId + 50 + k,
             title: title,
             body: body,
             scheduledDate: nudgeTime,
             notificationDetails: _defaultDetails(),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            androidScheduleMode: scheduleMode,
           );
         }
       }

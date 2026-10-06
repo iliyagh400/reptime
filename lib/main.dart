@@ -23,7 +23,7 @@ Future<void> main() async {
   try {
     await Supabase.initialize(
       url: 'https://psxcktkkrgtzudpcwiei.supabase.co',
-      publishableKey: 'GAPGPTMASKTOKENohquniy7eqqX0X',
+      publishableKey: 'sb_publishable_lK-ZFUm1Ni8Ax8aM93m0jg_Tx_225Uc',
     );
   } catch (e) {
     debugPrint('Supabase init error: $e');

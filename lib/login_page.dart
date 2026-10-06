@@ -898,6 +898,7 @@ class _LoginPageState extends State<LoginPage> {
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
     }     on AuthException catch (e) {
+      debugPrint('Supabase AuthException status: ${e.statusCode}, message: ${e.message}');
       if (!mounted) return;
       final raw = e.message.toLowerCase();
 

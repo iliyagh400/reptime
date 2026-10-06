@@ -229,7 +229,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
         'user_id': userId,
         'routine_id': routineId,
         'pet_id': petId,
-        'completed_at': DateTime.now().toIso8601String(),
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
         'status': status,
         'note': note,
       });
