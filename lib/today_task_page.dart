@@ -215,10 +215,21 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     final String processingKey = "${task.routine['id']}_${task.pet['id']}";
     if (_processingKeys.contains(processingKey)) return;
     _processingKeys.add(processingKey);
+    if (mounted) setState(() {});
+
+    final matchingTask = _tasks.firstWhere(
+      (candidate) =>
+          candidate.routine['id'] == task.routine['id'] &&
+          candidate.pet['id'] == task.pet['id'],
+      orElse: () => task,
+    );
+    final previousDone = matchingTask.isDone;
+    final previousSkipped = matchingTask.isSkipped;
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       _processingKeys.remove(processingKey);
+      if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -229,6 +240,10 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       }
       return;
     }
+
+    matchingTask.isDone = (status == 'done');
+    matchingTask.isSkipped = (status != 'done');
+    if (mounted) setState(() {});
 
     try {
       await Supabase.instance.client.from('completions').insert({
@@ -290,8 +305,10 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         debugPrint('Error managing notifications: $e');
       }
 
-      await _loadTodayTasks();
     } catch (e) {
+      matchingTask.isDone = previousDone;
+      matchingTask.isSkipped = previousSkipped;
+      if (mounted) setState(() {});
       debugPrint('Error responding to task: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -303,6 +320,7 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       }
     } finally {
       _processingKeys.remove(processingKey);
+      if (mounted) setState(() {});
     }
   }
 
@@ -729,10 +747,10 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
 class _TodayTask {
   final Map<String, dynamic> routine;
   final Map<String, dynamic> pet;
-  final bool isDone;
-  final bool isSkipped;
+  bool isDone;
+  bool isSkipped;
 
-  const _TodayTask({
+  _TodayTask({
     required this.routine,
     required this.pet,
     required this.isDone,

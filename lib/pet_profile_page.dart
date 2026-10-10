@@ -215,9 +215,17 @@ class _PetProfilePageState extends State<PetProfilePage> {
     if (_processingKeys.contains(key)) return;
 
     _processingKeys.add(key);
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
+
+    final matchingRoutine = _routines.firstWhere(
+      (candidate) => candidate['id'] == routineId,
+      orElse: () => routine,
+    );
+    final previousDone = matchingRoutine['isDoneToday'] == true;
+    final previousSkipped = matchingRoutine['isSkippedToday'] == true;
+    matchingRoutine['isDoneToday'] = (status == 'done');
+    matchingRoutine['isSkippedToday'] = (status != 'done');
+    if (mounted) setState(() {});
 
     final userId = user.id;
     final repeatType = routine['repeat_type'];
@@ -279,10 +287,10 @@ class _PetProfilePageState extends State<PetProfilePage> {
         debugPrint('Error updating routine notifications: $e');
       }
 
-      if (mounted) {
-        await _loadRoutines();
-      }
     } catch (e) {
+      matchingRoutine['isDoneToday'] = previousDone;
+      matchingRoutine['isSkippedToday'] = previousSkipped;
+      if (mounted) setState(() {});
       debugPrint('Error saving routine response: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -293,11 +301,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _processingKeys.remove(key);
-        });
-      }
+      _processingKeys.remove(key);
+      if (mounted) setState(() {});
     }
   }
 
