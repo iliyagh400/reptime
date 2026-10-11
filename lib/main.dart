@@ -73,10 +73,15 @@ class _MyAppState extends State<MyApp> {
       title: 'Reptime',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFF8DBD5A),
-        colorScheme: const ColorScheme.light(
+        scaffoldBackgroundColor: const Color(0xFF141C17),
+        canvasColor: const Color(0xFF141C17),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFF1B261F),
+        ),
+        colorScheme: const ColorScheme.dark(
           primary: Color(0xFF3F5D45),
           secondary: Color(0xFFC98A3E),
+          surface: Color(0xFF1B261F),
         ),
         appBarTheme: AppBarTheme(
           backgroundColor: const Color(0xFF3F5D45),
