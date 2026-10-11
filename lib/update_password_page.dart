@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_feedback.dart';
 
 class UpdatePasswordPage extends StatefulWidget {
   const UpdatePasswordPage({super.key});
@@ -45,19 +46,11 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'رمز عبور با موفقیت به‌روزرسانی شد. لطفاً وارد شوید.',
-            style: GoogleFonts.vazirmatn(color: Colors.white),
-          ),
-          backgroundColor: const Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+           AppFeedback.showSuccess(
+        context,
+        'رمز عبور با موفقیت به‌روزرسانی شد. لطفاً وارد شوید.',
       );
+
 
       // خروج ایمن از نشست ریکاوری بدون متوقف شدن در صورت خطای شبکه
       try {
@@ -68,34 +61,18 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on AuthException catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'خطایی در به‌روزرسانی رمز عبور رخ داد (ممکن است لینک منقضی شده باشد). لطفاً دوباره درخواست دهید.',
-            style: GoogleFonts.vazirmatn(color: Colors.white),
-          ),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+            AppFeedback.showError(
+        context,
+        'خطایی در به‌روزرسانی رمز عبور رخ داد (ممکن است لینک منقضی شده باشد). لطفاً دوباره درخواست دهید.',
       );
+
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'خطای غیرمنتظره‌ای رخ داد. لطفاً اتصال اینترنت را بررسی کرده و مجدداً تلاش کنید.',
-            style: GoogleFonts.vazirmatn(color: Colors.white),
-          ),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+            AppFeedback.showError(
+        context,
+        'خطای غیرمنتظره‌ای رخ داد. لطفاً اتصال اینترنت را بررسی کرده و مجدداً تلاش کنید.',
       );
+
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

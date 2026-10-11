@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
+import 'app_feedback.dart';
 
 /// Premium redesigned EditRoutinePage.
 ///
@@ -137,7 +138,8 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
     }
 
     if (_selectedPetIds.isEmpty) {
-      _showSnack('حداقل یک حیوون انتخاب کن');
+            _showSnack('حداقل یک حیوون انتخاب کن', isError: true);
+
       return;
     }
 
@@ -304,18 +306,11 @@ class _EditRoutinePageState extends State<EditRoutinePage> {
   }
 
 
-  void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFF5A2B28) : _surfaceRaised,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
+    void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+    AppFeedback.show(context, message, isError: isError);
   }
+
 
   Widget _sectionLabel(String text) {
     return Padding(

@@ -19,6 +19,7 @@ import 'add_event_page.dart';
 import 'species_data.dart';
 
 import 'add_checkin_page.dart';
+import 'app_feedback.dart';
 
 class PetProfilePage extends StatefulWidget {
 
@@ -119,9 +120,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
     } catch (e, stackTrace) {
       debugPrint('Failed to load routines: $e\n$stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('خطا در بارگذاری کارها')),
-      );
+            AppFeedback.showError(context, 'خطا در بارگذاری کارها');
+
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -152,9 +152,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
     } catch (e, stackTrace) {
       debugPrint('Failed to load latest check-in: $e\n$stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('خطا در بارگذاری آخرین چک‌این')),
-      );
+            AppFeedback.showError(context, 'خطا در بارگذاری آخرین چک‌این');
+
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -201,11 +200,11 @@ class _PetProfilePageState extends State<PetProfilePage> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
-        ),
+            AppFeedback.showError(
+        context,
+        'کاربر وارد نشده است. لطفاً ابتدا وارد شوید.',
       );
+
       return;
     }
 
@@ -255,12 +254,11 @@ class _PetProfilePageState extends State<PetProfilePage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+             AppFeedback.showSuccess(
+        context,
+        status == 'done' ? 'ثبت شد ✅' : 'رد شد ⏭️',
+      );
+
       }
 
       // 3. مدیریت ایمن نوتیفیکیشن‌ها بدون تداخل
@@ -293,12 +291,11 @@ class _PetProfilePageState extends State<PetProfilePage> {
       if (mounted) setState(() {});
       debugPrint('Error saving routine response: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('خطا در ثبت وضعیت. لطفاً دوباره تلاش کنید.'),
-            backgroundColor: _terracotta,
-          ),
-        );
+              AppFeedback.showError(
+        context,
+        'خطا در ثبت وضعیت. لطفاً دوباره تلاش کنید.',
+      );
+
       }
     } finally {
       _processingKeys.remove(key);

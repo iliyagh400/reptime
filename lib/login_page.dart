@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
 import 'signup_page.dart';
+import 'app_feedback.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -242,16 +243,8 @@ class _LoginPageState extends State<LoginPage> {
                           const ClipboardData(text: _supportTelegramId),
                         );
                         if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              backgroundColor: _surfaceRaised,
-                              behavior: SnackBarBehavior.floating,
-                              content: Text(
-                                'آیدی تلگرام کپی شد',
-                                style: GoogleFonts.vazirmatn(color: Colors.white),
-                              ),
-                            ),
-                          );
+                                AppFeedback.showSuccess(context, 'آیدی تلگرام کپی شد');
+
                         }
                       },
                       icon: const Icon(Icons.copy_rounded, size: 20, color: _sand),
@@ -414,16 +407,8 @@ class _LoginPageState extends State<LoginPage> {
                           const ClipboardData(text: _supportTelegramId),
                         );
                         if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              backgroundColor: _surfaceRaised,
-                              behavior: SnackBarBehavior.floating,
-                              content: Text(
-                                'آیدی تلگرام کپی شد',
-                                style: GoogleFonts.vazirmatn(color: Colors.white),
-                              ),
-                            ),
-                          );
+                                AppFeedback.showSuccess(context, 'آیدی تلگرام کپی شد');
+
                         }
                       },
                       icon: const Icon(Icons.copy_rounded, size: 20, color: _sand),
@@ -752,14 +737,8 @@ class _LoginPageState extends State<LoginPage> {
                                 final email = resetEmailController.text.trim();
                                 if (email.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: _errorRed,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      content: Text('لطفاً یک ایمیل معتبر وارد کنید.', style: GoogleFonts.vazirmatn(color: Colors.white)),
-                                    ),
-                                  );
+                                       AppFeedback.showError(context, 'لطفاً یک ایمیل معتبر وارد کنید.');
+
                                   return;
                                 }
 
@@ -776,30 +755,18 @@ class _LoginPageState extends State<LoginPage> {
                                   }
 
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: _moss,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      content: Text(
-                                        'لینک بازیابی به ایمیل شما ارسال شد. لطفاً صندوق ایمیل خود را بررسی کنید.',
-                                        style: GoogleFonts.vazirmatn(color: Colors.white),
-                                      ),
-                                    ),
-                                  );
+                                        AppFeedback.showSuccess(
+        context,
+        'لینک بازیابی به ایمیل شما ارسال شد. لطفاً صندوق ورودی (یا اسپم) را بررسی کنید.',
+      );
+
                                 } catch (_) {
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: _errorRed,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      content: Text(
-                                        'ارسال لینک بازیابی با خطا مواجه شد. لطفاً اتصال اینترنت خود را بررسی کنید.',
-                                        style: GoogleFonts.vazirmatn(color: Colors.white),
-                                      ),
-                                    ),
-                                  );
+                                      AppFeedback.showError(
+        context,
+        'ارسال لینک بازیابی با خطا مواجه شد. ممکن است ایمیل ثبت نشده باشد.',
+      );
+
                                 } finally {
                                   if (ctx.mounted) {
                                     setDialogState(() => isSubmitting = false);
@@ -915,36 +882,17 @@ class _LoginPageState extends State<LoginPage> {
       } else if (raw.contains('invalid email')) {
         setState(() => _emailError = 'فرمت ایمیل نامعتبر است.');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'خطایی در احراز هویت رخ داد. لطفاً مجدداً تلاش کنید.',
-              style: GoogleFonts.vazirmatn(color: Colors.white),
-            ),
-            backgroundColor: _errorRed,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+              AppFeedback.showError(
+        context,
+        'خطایی در احراز هویت رخ داد. لطفاً مجدداً تلاش کنید.',
+      );
+
       }
     }
 catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'خطا در اتصال به سرور.',
-              style: GoogleFonts.vazirmatn(color: Colors.white),
-            ),
-            backgroundColor: _errorRed,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+              AppFeedback.showError(context, 'خطا در اتصال به سرور.');
+
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

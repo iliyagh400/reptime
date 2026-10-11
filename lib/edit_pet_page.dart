@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'species_data.dart';
 import 'species_picker_page.dart';
 import 'notification_service.dart';
+import 'app_feedback.dart';
 
 class EditPetPage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -474,22 +475,11 @@ class _EditPetPageState extends State<EditPetPage> {
     }
   }
 
-  void _showSnack(
-    String message, {
-    bool isError = false,
-  }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? const Color(0xFF5A2B28) : _surfaceRaised,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
+   void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+    AppFeedback.show(context, message, isError: isError);
   }
+
 
   Widget _genderIcon(int? gender) {
     switch (gender) {

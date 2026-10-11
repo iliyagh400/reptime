@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
+import 'app_feedback.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -289,19 +290,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? const Color(0xFF5A2B28) : _surface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
+    AppFeedback.show(context, message, isError: isError);
   }
+
 
   Future<void> _saveBool(String key, bool value) async => (await SharedPreferences.getInstance()).setBool(key, value);
   Future<void> _saveInt(String key, int value) async => (await SharedPreferences.getInstance()).setInt(key, value);

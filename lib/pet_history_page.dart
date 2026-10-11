@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_feedback.dart';
 
 class PetHistoryPage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -171,19 +172,11 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
       debugPrint('History stack: $stack');
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'خطایی در دریافت تاریخچه رخ داد. لطفاً دوباره تلاش کنید.',
-              style: TextStyle(fontFamily: 'Vazirmatn'),
-            ),
-            backgroundColor: _surfaceRaised,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-          ),
+                AppFeedback.showError(
+          context,
+          'خطایی در دریافت تاریخچه رخ داد. لطفاً دوباره تلاش کنید.',
         );
+
       }
     } finally {
       _isFetching = false;

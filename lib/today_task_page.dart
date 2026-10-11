@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'notification_service.dart';
 import 'routine_logic.dart';
+import 'app_feedback.dart';
 
 class TodayTasksPage extends StatefulWidget {
   const TodayTasksPage({super.key});
@@ -150,12 +151,8 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     } catch (e) {
      debugPrint('Error loading today tasks: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('خطا در دریافت کارهای امروز'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
+              AppFeedback.showError(context, 'خطا در دریافت کارهای امروز');
+
       }
     
     } finally {
@@ -231,12 +228,11 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       _processingKeys.remove(processingKey);
       if (mounted) setState(() {});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('کاربر وارد نشده است. لطفاً ابتدا وارد شوید.'),
-            backgroundColor: _terracotta,
-          ),
-        );
+              AppFeedback.showError(
+        context,
+        'کاربر وارد نشده است. لطفاً ابتدا وارد شوید.',
+      );
+
       }
       return;
     }
@@ -256,14 +252,11 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              status == 'done' ? 'کار با موفقیت ثبت شد ✅' : 'کار رد شد ⏭️',
-            ),
-            backgroundColor: _forest,
-          ),
-        );
+              AppFeedback.showSuccess(
+        context,
+        status == 'done' ? 'کار با موفقیت ثبت شد ✅' : 'کار رد شد ⏭️',
+      );
+
       }
 
       // بخش مدیریت نوتیفیکیشن‌ها محصور در try/catch مجزا
@@ -311,12 +304,8 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       if (mounted) setState(() {});
       debugPrint('Error responding to task: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('ثبت وضعیت کار انجام نشد'),
-            backgroundColor: _terracotta,
-          ),
-        );
+             AppFeedback.showError(context, 'ثبت وضعیت کار انجام نشد');
+
       }
     } finally {
       _processingKeys.remove(processingKey);

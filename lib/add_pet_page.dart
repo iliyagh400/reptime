@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'species_data.dart';
 import 'species_picker_page.dart';
+import 'app_feedback.dart';
 
 /// Premium redesigned AddPetPage.
 ///
@@ -218,18 +219,11 @@ class _AddPetPageState extends State<AddPetPage> {
   }
 
 
-  void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFF5A2B28) : _surfaceRaised,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
+    void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+    AppFeedback.show(context, message, isError: isError);
   }
+
 Widget _genderIcon(int? gender) {
   switch (gender) {
     case 1:

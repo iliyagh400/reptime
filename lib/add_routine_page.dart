@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
+import 'app_feedback.dart';
 
 /// Premium redesigned AddRoutinePage.
 ///
@@ -223,18 +224,10 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
   }
 
 
-  void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFF5A2B28) : _surfaceRaised,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
+    void _showSnack(String message, {bool isError = false}) {
+    AppFeedback.show(context, message, isError: isError);
   }
+
 
   Widget _sectionLabel(String text) {
     return Padding(

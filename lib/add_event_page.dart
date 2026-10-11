@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_feedback.dart';
 
 class AddEventPage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -65,20 +66,19 @@ class _AddEventPageState extends State<AddEventPage> {
     if (_isLoading) return;
 
     if (_descriptionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('توضیح اتفاق رو بنویس')),
-      );
+           AppFeedback.showError(context, 'توضیح اتفاق رو بنویس');
+
       return;
     }
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ابتدا باید وارد حساب کاربری خود شوید.'),
-          ),
-        );
+              AppFeedback.showError(
+        context,
+        'ابتدا باید وارد حساب کاربری خود شوید.',
+      );
+
       }
       return;
     }
@@ -94,19 +94,18 @@ class _AddEventPageState extends State<AddEventPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اتفاق ثبت شد ✅')),
-        );
+              AppFeedback.showSuccess(context, 'اتفاق ثبت شد ✅');
+
         Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Error saving event: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.'),
-          ),
-        );}
+            AppFeedback.showError(
+        context,
+        'خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.',
+      );
+}
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'app_feedback.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -49,23 +50,10 @@ class _SignupPageState extends State<SignupPage> {
     super.dispose();
   }
 
-  void _showGeneralMessage(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: _surfaceRaised,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: _line),
-        ),
-        behavior: SnackBarBehavior.floating,
-        content: Directionality(
-          textDirection: TextDirection.rtl,
-          child: Text(text, style: const TextStyle(color: _text)),
-        ),
-      ),
-    );
+    void _showGeneralMessage(String text) {
+    AppFeedback.show(context, text);
   }
+
 
   Future<bool> _checkEmailAllowed(String email) async {
     try {
@@ -147,21 +135,11 @@ class _SignupPageState extends State<SignupPage> {
                         Clipboard.setData(
                           const ClipboardData(text: _supportTelegramId),
                         );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: _surfaceRaised,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: const BorderSide(color: _line),
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                            content: const Text(
-                              'آیدی پشتیبانی کپی شد ✅',
-                              style: TextStyle(color: _text),
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
+                                                      AppFeedback.showSuccess(
+                                context,
+                                'آیدی پشتیبانی کپی شد ✅',
+                              );
+
                       },
                     ),
                   ],

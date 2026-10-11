@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_feedback.dart';
 
 class AddCheckinPage extends StatefulWidget {
   final Map<String, dynamic> pet;
@@ -67,9 +68,11 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ابتدا باید وارد حساب کاربری خود شوید.')),
-        );
+             AppFeedback.showError(
+        context,
+        'ابتدا باید وارد حساب کاربری خود شوید.',
+      );
+
       }
       return;
     }
@@ -82,11 +85,11 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
       parsedWeight = double.tryParse(normalized);
       if (parsedWeight == null || parsedWeight <= 0) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('لطفاً وزن معتبر و بزرگتر از صفر وارد کنید.'),
-            ),
-          );
+                 AppFeedback.showError(
+          context,
+          'لطفاً وزن معتبر و بزرگتر از صفر وارد کنید.',
+        );
+
         }
         return;
       }
@@ -120,19 +123,18 @@ class _AddCheckinPageState extends State<AddCheckinPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اطلاعات ثبت شد ✅')),
-      );
+            AppFeedback.showSuccess(context, 'اطلاعات ثبت شد ✅');
+
       Navigator.pop(context, true);
     } catch (e) {
       debugPrint('Error saving checkin: $e');
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.'),
-        ),
+           AppFeedback.showError(
+        context,
+        'خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.',
       );
+
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

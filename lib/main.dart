@@ -8,6 +8,7 @@ import 'signup_page.dart';
 import 'update_password_page.dart';
 import 'notification_service.dart';
 
+
 // کلید سراسری برای ناوبری هنگام دریافت رویدادهای دیپ‌لینک
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -78,6 +79,19 @@ class _MyAppState extends State<MyApp> {
         dialogTheme: const DialogThemeData(
           backgroundColor: Color(0xFF1B261F),
         ),
+                snackBarTheme: SnackBarThemeData(
+          backgroundColor: const Color(0xFF2D3930),
+          contentTextStyle: const TextStyle(
+            color: Color(0xFFECE8DD),
+            fontFamily: 'Vazirmatn',
+            fontSize: 14,
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF3F5D45),
           secondary: Color(0xFFC98A3E),
