@@ -560,13 +560,41 @@ Widget _buildTodayHero() {
             padding: const EdgeInsets.all(22),
             child: FutureBuilder<Map<String, int>>(
               future: _overallTodayStatus(),
-              builder: (context, snapshot) {
-                // گارد ایمنی در صورت بروز خطا، نبود داده یا نال بودن snapshot
-                final status = (snapshot.hasError || !snapshot.hasData || snapshot.data == null)
-                    ? {'total': 0, 'done': 0}
-                    : snapshot.data!;
+                            builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 110,
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFD9E9D7),
+                        ),
+                      ),
+                    ),
+                  );
+                }
 
+                if (snapshot.hasError) {
+                  return const SizedBox(
+                    height: 110,
+                    child: Center(
+                      child: Text(
+                        'خطا در دریافت وضعیت کارها',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final status = snapshot.data ?? {'total': 0, 'done': 0};
                 final total = status['total'] ?? 0;
+
                 final done = status['done'] ?? 0;
 
                 final remaining = (total - done).clamp(0, total);
@@ -890,6 +918,8 @@ Widget _buildTodayHero() {
             final progress =
                 total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
             final allDone = total > 0 && done >= total;
+            final isCardLoading = snapshot.connectionState == ConnectionState.waiting;
+
             return Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -903,6 +933,7 @@ Widget _buildTodayHero() {
                   total: total,
                   done: done,
                   allDone: allDone,
+                  isLoading: isCardLoading,
                   imageBuilder: () => _buildPetIcon(
                     pet,
                     size: 72,
@@ -1162,6 +1193,7 @@ class _PetCard extends StatelessWidget {
   final bool allDone;
   final Widget Function() imageBuilder;
   final VoidCallback onTap;
+  final bool isLoading;
 
   const _PetCard({
     required this.pet,
@@ -1171,6 +1203,7 @@ class _PetCard extends StatelessWidget {
     required this.allDone,
     required this.imageBuilder,
     required this.onTap,
+    this.isLoading = false,
   });
 
   @override
@@ -1290,11 +1323,13 @@ class _PetCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              total == 0
-                                  ? 'امروز روتینی نداره'
-                                  : allDone
-                                      ? 'مراقبت امروز کامل شد'
-                                      : '$done از $total فعالیت انجام شده',
+                                 isLoading
+                                   ? 'در حال بررسی کارهای امروز...'
+                                     : total == 0
+                                    ? 'امروز روتینی نداره'
+                                     : allDone
+                                   ? 'مراقبت امروز کامل شد'
+                                     : '$done از $total فعالیت انجام شده',
                               style: TextStyle(
                                 color: allDone
                                     ? const Color(0xFF91B66D)
