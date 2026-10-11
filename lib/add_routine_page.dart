@@ -141,6 +141,10 @@ class _AddRoutinePageState extends State<AddRoutinePage> {
       _showSnack('حداقل یک حیوون انتخاب کن', isError: true);
       return;
     }
+       if (_titleController.text.trim().isEmpty) {
+      _showSnack('لطفاً عنوان روتین را وارد کنید', isError: true);
+      return;
+    }
 
     if (_repeatType == 'weekly' && _selectedWeekdays.isEmpty) {
       _showSnack('لطفاً حداقل یک روز از هفته را انتخاب کنید', isError: true);
