@@ -178,36 +178,65 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     return routine['title']?.toString() ?? 'رسیدگی';
   }
 
-  String _routineType(Map<String, dynamic> routine) {
-    switch (routine['type']?.toString()) {
-      case 'food':
-        return 'غذا';
-      case 'cleaning':
-        return 'نظافت';
-      case 'medicine':
-        return 'دارو';
-      case 'water':
-        return 'آب';
-      default:
-        return _routineTitle(routine);
-    }
+ String _routineType(Map<String, dynamic> routine) {
+  final rawType = routine['type']?.toString().toLowerCase().trim();
+  switch (rawType) {
+    case 'food':
+      return 'غذا';
+    case 'water':
+      return 'آب';
+    case 'cleaning':
+      return 'نظافت';
+    case 'humidity':
+      return 'رطوبت و مه‌پاشی';
+    case 'temperature':
+      return 'بررسی دما';
+    case 'lighting':
+      return 'نور و UVB';
+    case 'shedding':
+      return 'پوست‌اندازی';
+    case 'weight':
+      return 'وزن‌کشی';
+    case 'medicine':
+      return 'دارو و درمان';
+    case 'health':
+      return 'بررسی سلامتی';
+    case 'other':
+      return 'سایر موارد';
+    default:
+      return _routineTitle(routine);
   }
+}
 
-  IconData _routineIcon(Map<String, dynamic> routine) {
-    switch (routine['type']?.toString()) {
-      case 'food':
-        return Icons.restaurant_rounded;
-      case 'cleaning':
-        return Icons.cleaning_services_rounded;
-      case 'medicine':
-        return Icons.medication_rounded;
-      case 'water':
-        return Icons.water_drop_rounded;
-      default:
-        return Icons.pets_rounded;
-    }
+ IconData _routineIcon(Map<String, dynamic> routine) {
+  final rawType = routine['type']?.toString().toLowerCase().trim();
+  switch (rawType) {
+    case 'food':
+      return Icons.restaurant_rounded;
+    case 'water':
+      return Icons.water_drop_rounded;
+    case 'cleaning':
+      return Icons.cleaning_services_rounded;
+    case 'humidity':
+      return Icons.water_rounded;
+    case 'temperature':
+      return Icons.thermostat_rounded;
+    case 'lighting':
+      return Icons.wb_sunny_rounded;
+    case 'shedding':
+      return Icons.auto_awesome_rounded;
+    case 'weight':
+      return Icons.scale_rounded;
+    case 'medicine':
+      return Icons.medication_rounded;
+    case 'health':
+      return Icons.favorite_rounded;
+    case 'other':
+      return Icons.more_horiz_rounded;
+    default:
+      return Icons.pets_rounded;
   }
-
+}
         Future<void> _respond(_TodayTask task, String status, {String? note}) async {
     final String processingKey = "${task.routine['id']}_${task.pet['id']}";
     if (_processingKeys.contains(processingKey)) return;

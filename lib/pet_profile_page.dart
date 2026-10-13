@@ -432,66 +432,89 @@ class _PetProfilePageState extends State<PetProfilePage> {
       await _respond(routine, 'skipped', note: note.isEmpty ? null : note);
     }
   }
-  String _typeLabel(String type) {
-    switch (type) {
-      case 'food':
-        return 'غذا';
-      case 'cleaning':
-        return 'نظافت';
-      case 'medicine':
-        return 'دارو';
-      default:
-        return 'دیگر';
-    }
+ String _typeLabel(String type) {
+  switch (type.toLowerCase().trim()) {
+    case 'food':
+      return 'غذا';
+    case 'water':
+      return 'آب';
+    case 'cleaning':
+      return 'نظافت';
+    case 'humidity':
+      return 'رطوبت و مه‌پاشی';
+    case 'temperature':
+      return 'بررسی دما';
+    case 'lighting':
+      return 'نور و UVB';
+    case 'shedding':
+      return 'پوست‌اندازی';
+    case 'weight':
+      return 'وزن‌کشی';
+    case 'medicine':
+      return 'دارو و درمان';
+    case 'health':
+      return 'بررسی سلامتی';
+    case 'other':
+    default:
+      return 'سایر موارد';
   }
+}
 
   IconData _typeIcon(String type) {
-
-    switch (type) {
-
-      case 'food':
-
-        return Icons.restaurant;
-
-      case 'cleaning':
-
-        return Icons.cleaning_services;
-
-      case 'medicine':
-
-        return Icons.medication;
-
-      default:
-
-        return Icons.event_note;
-
-    }
-
+  switch (type.toLowerCase().trim()) {
+    case 'food':
+      return Icons.restaurant_rounded;
+    case 'water':
+      return Icons.water_drop_rounded;
+    case 'cleaning':
+      return Icons.cleaning_services_rounded;
+    case 'humidity':
+      return Icons.water_rounded;
+    case 'temperature':
+      return Icons.thermostat_rounded;
+    case 'lighting':
+      return Icons.wb_sunny_rounded;
+    case 'shedding':
+      return Icons.auto_awesome_rounded;
+    case 'weight':
+      return Icons.scale_rounded;
+    case 'medicine':
+      return Icons.medication_rounded;
+    case 'health':
+      return Icons.favorite_rounded;
+    case 'other':
+    default:
+      return Icons.more_horiz_rounded;
   }
+}
 
   Color _typeColor(String type) {
-
-    switch (type) {
-
-      case 'food':
-
-        return _moss;
-
-      case 'cleaning':
-
-        return const Color(0xFF71807A);
-
-      case 'medicine':
-
-        return _terracotta;
-
-      default:
-
-        return const Color(0xFF727A70);
-
-    }
-
+  switch (type.toLowerCase().trim()) {
+    case 'food':
+      return const Color(0xFF66BB6A); // Green
+    case 'water':
+      return const Color(0xFF4FA8D6); // Light Blue
+    case 'cleaning':
+      return const Color(0xFF2EC4B6); // Teal
+    case 'humidity':
+      return const Color(0xFF48CAE4); // Aqua Blue
+    case 'temperature':
+      return const Color(0xFFE76F51); // Amber / Orange
+    case 'lighting':
+      return const Color(0xFFF4A261); // Warm Sun
+    case 'shedding':
+      return const Color(0xFF9D4EDD); // Purple
+    case 'weight':
+      return const Color(0xFF8E9AAF); // Slate
+    case 'medicine':
+      return const Color(0xFFE63946); // Red
+    case 'health':
+      return const Color(0xFFFF6B6B); // Coral / Pink
+    case 'other':
+    default:
+      return const Color(0xFF9E9E9E); // Grey
   }
+}
 
   Widget _buildPetIcon(Map<String, dynamic> pet, {required double size}) {
 
@@ -526,95 +549,113 @@ class _PetProfilePageState extends State<PetProfilePage> {
     );
 
   }
-    Widget _buildUpcomingSection() {
-    if (_upcomingRoutines.isEmpty) {
-      return const SizedBox.shrink();
-    }
+        Widget _buildUpcomingSection() {
+    if (_upcomingRoutines.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
           child: Text(
             'کارهای آینده',
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _sand,
-              letterSpacing: 0.5,
+              color: _sand.withValues(alpha: 0.8),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
         ..._upcomingRoutines.map((r) {
-          final type = r['type'] ?? 'other';
           final nextDate = r['nextDueDate'] as DateTime?;
           final dateStr = nextDate != null
               ? '${nextDate.year}/${nextDate.month.toString().padLeft(2, '0')}/${nextDate.day.toString().padLeft(2, '0')}'
               : '';
 
           return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: _surfaceRaised,
-              borderRadius: BorderRadius.circular(16),
+              color: _surface,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: _line),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: _typeColor(type).withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(_typeIcon(type), color: _typeColor(type), size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            clipBehavior: Clip.antiAlias,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                hoverColor: _moss.withValues(alpha: 0.08),
+                splashColor: _moss.withValues(alpha: 0.16),
+                highlightColor: _moss.withValues(alpha: 0.10),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditRoutinePage(
+                        routine: r,
+                        pets: _allPets,
+                      ),
+                    ),
+                  );
+                  _loadRoutines();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
                     children: [
-                      Text(
-                        r['title'] ?? '',
-                        style: const TextStyle(
-                          color: _text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _surfaceRaised,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _line),
+                        ),
+                        child: Icon(
+                          Icons.event_note,
+                          color: _muted,
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'موعد بعدی: $dateStr',
-                        style: const TextStyle(
-                          color: _muted,
-                          fontSize: 12,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              r['title'] ?? '',
+                              style: TextStyle(
+                                color: _text.withValues(alpha: 0.75),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'موعد بعدی: $dateStr',
+                              style: const TextStyle(
+                                color: _muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      Icon(
+                        Icons.chevron_left,
+                        color: _muted.withValues(alpha: 0.6),
+                        size: 20,
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _line),
-                  ),
-                  child: Text(
-                    _typeLabel(type),
-                    style: const TextStyle(color: _muted, fontSize: 11),
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         }),
       ],
     );
   }
+
+
 
   @override
 
