@@ -36,7 +36,7 @@ class PetProfilePage extends StatefulWidget {
 class _PetProfilePageState extends State<PetProfilePage> {
 
   List<Map<String, dynamic>> _routines = [];
-
+  List<Map<String, dynamic>> _upcomingRoutines = [];
   List<Map<String, dynamic>> _allPets = [];
 
   Map<String, dynamic>? _latestCheckin;
@@ -68,6 +68,79 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
     _loadLatestCheckin();
 
+  }
+      DateTime? _calculateNextOccurrence(
+      Map<String, dynamic> routine, List<Map<String, dynamic>> completions) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final repeatType = (routine['repeat_type'] ?? '').toString().toLowerCase();
+
+    if (repeatType == 'daily') {
+      return today.add(const Duration(days: 1));
+    }
+
+    if (repeatType == 'weekly') {
+      final rawDays = routine['weekdays'];
+      if (rawDays is! List || rawDays.isEmpty) return null;
+      final validDays = <int>{};
+      for (final day in rawDays) {
+        final numDay = weekdayNumberFromShortName(day.toString());
+        if (numDay != null) validDays.add(numDay);
+      }
+      if (validDays.isEmpty) return null;
+      for (int offset = 1; offset <= 7; offset++) {
+        final candidate = today.add(Duration(days: offset));
+        if (validDays.contains(candidate.weekday)) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    if (repeatType == 'monthly') {
+      final monthDay = int.tryParse(routine['month_day']?.toString() ?? '');
+      if (monthDay == null) return null;
+
+      int clampDay(int y, int m, int d) {
+        final lastDay = DateTime(y, m + 1, 0).day;
+        if (d < 1) return 1;
+        return d > lastDay ? lastDay : d;
+      }
+
+      if (monthDay > today.day) {
+        final d = clampDay(today.year, today.month, monthDay);
+        final candidate = DateTime(today.year, today.month, d);
+        if (candidate.isAfter(today)) return candidate;
+      }
+      final nextMonth = DateTime(today.year, today.month + 1, 1);
+      final d = clampDay(nextMonth.year, nextMonth.month, monthDay);
+      return DateTime(nextMonth.year, nextMonth.month, d);
+    }
+
+    if (repeatType == 'interval') {
+      final days = int.tryParse(routine['interval_days']?.toString() ?? '') ?? 1;
+      final intervalDays = days <= 0 ? 1 : days;
+      final lastComp = lastCompletionDate(completions, routine['id']);
+
+
+      if (lastComp != null) {
+        final compDate = DateTime(lastComp.year, lastComp.month, lastComp.day);
+        final next = compDate.add(Duration(days: intervalDays));
+        if (next.isAfter(today)) return next;
+        return today.add(Duration(days: intervalDays));
+      } else {
+        final start = routine['start_date'] != null
+            ? DateTime.tryParse(routine['start_date'].toString())
+            : null;
+        if (start != null) {
+          final startDate = DateTime(start.year, start.month, start.day);
+          if (startDate.isAfter(today)) return startDate;
+        }
+        return today.add(Duration(days: intervalDays));
+      }
+    }
+
+    return null;
   }
 
       Future<void> _loadRoutines() async {
@@ -105,6 +178,8 @@ class _PetProfilePageState extends State<PetProfilePage> {
       final completions = List<Map<String, dynamic>>.from(completionsResponse);
 
       final List<Map<String, dynamic>> relevantToday = [];
+      final List<Map<String, dynamic>> upcomingList = [];
+
       for (final routine in petRoutines) {
         if (isRelevantToday(routine, completions)) {
           relevantToday.add({
@@ -113,21 +188,35 @@ class _PetProfilePageState extends State<PetProfilePage> {
             'isSkippedToday': isSkippedToday(routine, completions),
           });
         }
+
+        final nextDate = _calculateNextOccurrence(routine, completions);
+        if (nextDate != null) {
+          upcomingList.add({
+            ...routine,
+            'nextDueDate': nextDate,
+          });
+        }
       }
 
+      upcomingList.sort((a, b) =>
+          (a['nextDueDate'] as DateTime).compareTo(b['nextDueDate'] as DateTime));
+
       if (!mounted) return;
-      setState(() => _routines = relevantToday);
+      setState(() {
+        _routines = relevantToday;
+        _upcomingRoutines = upcomingList;
+      });
     } catch (e, stackTrace) {
       debugPrint('Failed to load routines: $e\n$stackTrace');
       if (!mounted) return;
-            AppFeedback.showError(context, 'خطا در بارگذاری کارها');
-
+      AppFeedback.showError(context, 'خطا در بارگذاری کارها');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
+
 
 
 
@@ -436,6 +525,95 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
     );
 
+  }
+    Widget _buildUpcomingSection() {
+    if (_upcomingRoutines.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+          child: Text(
+            'کارهای آینده',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _sand,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        ..._upcomingRoutines.map((r) {
+          final type = r['type'] ?? 'other';
+          final nextDate = r['nextDueDate'] as DateTime?;
+          final dateStr = nextDate != null
+              ? '${nextDate.year}/${nextDate.month.toString().padLeft(2, '0')}/${nextDate.day.toString().padLeft(2, '0')}'
+              : '';
+
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _surfaceRaised,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _line),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _typeColor(type).withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(_typeIcon(type), color: _typeColor(type), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r['title'] ?? '',
+                        style: const TextStyle(
+                          color: _text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'موعد بعدی: $dateStr',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _line),
+                  ),
+                  child: Text(
+                    _typeLabel(type),
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
   }
 
   @override
@@ -855,253 +1033,153 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
                 ),
 
-                Expanded(
-
-                  child: _routines.isEmpty
-
-                      ? Center(
-
-                          child: Text(
-
-                            'امروز کاری برای این حیوون نیست 🎉',
-
-                            style: TextStyle(color: _muted),
-
+                                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.only(bottom: 90),
+                    children: [
+                      if (_routines.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Text(
+                              'امروز کاری برای این حیوون نیست 🎉',
+                              style: TextStyle(color: _muted),
+                            ),
                           ),
-
                         )
-
-                      : ListView.builder(
-
-                          padding: const EdgeInsets.only(bottom: 90),
-
-                          itemCount: _routines.length,
-
-                          itemBuilder: (context, index) {
-
-                            final r = _routines[index];
-
-                            final doneToday = r['isDoneToday'] == true;
-
-                            final skippedToday = r['isSkippedToday'] == true;
-
-                            final type = r['type'] ?? 'other';
-                            final isBusy = _processingKeys.contains('${r['id']}_${widget.pet['id']}');
-                            return Container(
-
-                              margin: const EdgeInsets.symmetric(
-
-                                  horizontal: 16, vertical: 6),
-
-                              decoration: BoxDecoration(
-
-                                color: _surface,
-
-                                borderRadius: BorderRadius.circular(18),
-
-                                border: Border.all(
-
-                                    color: _line),
-
-                              ),
-
-                              clipBehavior: Clip.antiAlias,
-
-                              child: Material(
-
-                                color: Colors.transparent,
-
-                                child: InkWell(
-
-                                  onTap: () async {
-
-                                    await Navigator.push(
-
-                                      context,
-
-                                      MaterialPageRoute(
-
-                                        builder: (context) =>
-
-                                            EditRoutinePage(
-
-                                                routine: r,
-
-                                                pets: _allPets),
-
-                                      ),
-
-                                    );
-
-                                    _loadRoutines();
-
-                                  },
-
-                                  child: Padding(
-
-                                    padding: const EdgeInsets.all(12),
-
-                                    child: Row(
-
-                                      children: [
-
-                                        Stack(
-                                              clipBehavior: Clip.none,
-                                              children: [
-                                                Container(
-                                                  width: 44,
-                                                  height: 44,
-                                                  decoration: BoxDecoration(
-                                                    color: _typeColor(type).withOpacity(0.18),
-                                                    borderRadius: BorderRadius.circular(12),
-                                                  ),
-                                                  child: Icon(_typeIcon(type), color: _typeColor(type)),
-                                                ),
-                                                if (doneToday)
-                                                  const Positioned(
-                                                    right: -2,
-                                                    bottom: -2,
-                                                    child: Icon(Icons.check_circle, color: _moss, size: 16),
-                                                  ),
-                                              ],
-                                            ),
-
-                                        const SizedBox(width: 12),
-
-                                        Expanded(
-
-                                          child: Column(
-
-                                            crossAxisAlignment:
-
-                                                CrossAxisAlignment.start,
-
-                                            children: [
-
-                                              Text(
-
-                                                r['title'] ?? '',
-
-                                                style: TextStyle(
-
-                                                  fontSize: 15,
-
-                                                  fontWeight:
-
-                                                      FontWeight.w600,
-
-                                                  decoration: (doneToday ||
-
-                                                          skippedToday)
-
-                                                      ? TextDecoration
-
-                                                          .lineThrough
-
-                                                      : null,
-
-                                                  color: (doneToday ||
-
-                                                          skippedToday)
-
-                                                      ? _muted
-
-                                                      : _text,
-
-                                                ),
-
-                                              ),
-
-                                              const SizedBox(height: 2),
-
-                                              Text(
-
-                                                skippedToday
-
-                                                    ? '${_typeLabel(type)} · رد شد'
-
-                                                    : '${_typeLabel(type)} · ${r['time'] ?? ''}',
-
-                                                style: TextStyle(
-
-                                                  fontSize: 12,
-
-                                                  color: _muted,
-
-                                                ),
-
-                                              ),
-
-                                            ],
-
-                                          ),
-
-                                        ),
-
-                                        if (doneToday)
-
-                                          const Icon(Icons.check_circle,
-
-                                              color: _moss)
-
-                                        else if (skippedToday)
-
-                                          const Icon(Icons.cancel,
-
-                                              color: _muted)
-
-                                        else
-
-                                          Row(
-
-                                            mainAxisSize: MainAxisSize.min,
-
-                                            children: [
-
-                                              IconButton(
-
-                                                icon: const Icon(
-
-                                                    Icons.close),
-
-                                                color: _muted,
-
-                                                tooltip: 'رد کردن این بار',
-
-                                                  onPressed: isBusy ? null : () => _showSkipDialog(r),),
-
-                                              IconButton(
-
-                                                icon: const Icon(Icons
-
-                                                    .check_circle_outline),
-
-                                                color: const Color(
-
-                                                    0xFF6E8B52),
-
-                                                  onPressed: isBusy ? null : () => _respond(r, 'done'),),
-                                            ],
-
-                                          ),
-
-                                      ],
-
+                      else
+                        ..._routines.map((r) {
+                          final doneToday = r['isDoneToday'] == true;
+                          final skippedToday = r['isSkippedToday'] == true;
+                          final type = r['type'] ?? 'other';
+                          final isBusy = _processingKeys
+                              .contains('${r['id']}_${widget.pet['id']}');
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _surface,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: _line),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => EditRoutinePage(
+                                          routine: r, pets: _allPets),
                                     ),
-
+                                  );
+                                  _loadRoutines();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Row(
+                                    children: [
+                                      Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: _typeColor(type)
+                                                  .withOpacity(0.18),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Icon(_typeIcon(type),
+                                                color: _typeColor(type)),
+                                          ),
+                                          if (doneToday)
+                                            const Positioned(
+                                              right: -2,
+                                              bottom: -2,
+                                              child: Icon(Icons.check_circle,
+                                                  color: _moss, size: 16),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              r['title'] ?? '',
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                decoration:
+                                                    (doneToday || skippedToday)
+                                                        ? TextDecoration
+                                                            .lineThrough
+                                                        : null,
+                                                color:
+                                                    (doneToday || skippedToday)
+                                                        ? _muted
+                                                        : _text,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              skippedToday
+                                                  ? '${_typeLabel(type)} · رد شد'
+                                                  : '${_typeLabel(type)} · ${r['time'] ?? ''}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: _muted,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (doneToday)
+                                        const Icon(Icons.check_circle,
+                                            color: _moss)
+                                      else if (skippedToday)
+                                        const Icon(Icons.cancel,
+                                            color: _muted)
+                                      else
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.close),
+                                              color: _muted,
+                                              tooltip: 'رد کردن این بار',
+                                              onPressed: isBusy
+                                                  ? null
+                                                  : () => _showSkipDialog(r),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                  Icons.check_circle_outline),
+                                              color: const Color(0xFF6E8B52),
+                                              onPressed: isBusy
+                                                  ? null
+                                                  : () => _respond(r, 'done'),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
                                   ),
-
                                 ),
-
                               ),
-
-                            );
-
-                          },
-
-                        ),
-
+                            ),
+                          );
+                        }),
+                      _buildUpcomingSection(),
+                    ],
+                  ),
                 ),
+
 
               ],
 
