@@ -11,6 +11,7 @@ import 'login_page.dart';
 import 'species_data.dart';
 import 'animated_entry.dart';
 import 'today_task_page.dart';
+import 'all_routines_page.dart';
 
 
 /// Premium redesigned HomePage.
@@ -385,7 +386,11 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                sliver: SliverToBoxAdapter(child: _buildAllRoutinesBar()),
+              ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
             sliver: SliverToBoxAdapter(
               child: _buildQuickActions(),
             ),
@@ -723,6 +728,81 @@ Widget _buildTodayHero() {
 }
 
 
+    Widget _buildAllRoutinesBar() {
+    return Material(
+      color: const Color(0xFF263229),
+      borderRadius: BorderRadius.circular(21),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(21),
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AllRoutinesPage(),
+            ),
+          );
+          _loadPets();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(21),
+            border: Border.all(color: _line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  color: _forest.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _forest.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.format_list_bulleted_rounded,
+                  color: _forest,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'لیست روتین های من',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'مشاهده و وضعیت روتین تمام حیوانات',
+                      style: TextStyle(
+                        color: _sand,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: _sand,
+                size: 14,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildQuickActions() {
     return Column(
