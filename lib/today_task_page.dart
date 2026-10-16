@@ -162,6 +162,255 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
       }
     }
   }
+    List<_TodayTask> _getEligiblePeerTasks(_TodayTask task) {
+    return _tasks.where((t) {
+      final key = "${t.routine['id']}_${t.pet['id']}";
+      return t.routine['id'] == task.routine['id'] &&
+          !t.isDone &&
+          !t.isSkipped &&
+          !_processingKeys.contains(key);
+    }).toList();
+  }
+
+  Future<void> _respondGroup(
+    _TodayTask baseTask,
+    String status, {
+    String? note,
+  }) async {
+    final targets = _getEligiblePeerTasks(baseTask);
+    if (targets.isEmpty) return;
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        AppFeedback.showError(
+          context,
+          'کاربر وارد نشده است. لطفاً ابتدا وارد شوید.',
+        );
+      }
+      return;
+    }
+
+    // قفل کردن تمام کلیدها پیش از شروع عملیات
+    final List<String> lockedKeys = [];
+    for (final t in targets) {
+      final key = "${t.routine['id']}_${t.pet['id']}";
+      _processingKeys.add(key);
+      lockedKeys.add(key);
+    }
+    if (mounted) setState(() {});
+
+    int successCount = 0;
+    int failCount = 0;
+
+    for (final target in targets) {
+      final matchingTask = _tasks.firstWhere(
+        (candidate) =>
+            candidate.routine['id'] == target.routine['id'] &&
+            candidate.pet['id'] == target.pet['id'],
+        orElse: () => target,
+      );
+
+      final previousDone = matchingTask.isDone;
+      final previousSkipped = matchingTask.isSkipped;
+
+      matchingTask.isDone = (status == 'done');
+      matchingTask.isSkipped = (status != 'done');
+      if (mounted) setState(() {});
+
+      try {
+        await Supabase.instance.client.from('completions').insert({
+          'user_id': user.id,
+          'routine_id': target.routine['id'],
+          'pet_id': target.pet['id'],
+          'completed_at': DateTime.now().toUtc().toIso8601String(),
+          'status': status,
+          if (note != null && note.isNotEmpty) 'note': note,
+        });
+        successCount++;
+      } catch (e) {
+        failCount++;
+        matchingTask.isDone = previousDone;
+        matchingTask.isSkipped = previousSkipped;
+        if (mounted) setState(() {});
+        debugPrint('Error completing group task for pet ${target.pet['id']}: $e');
+      }
+    }
+
+    // باز کردن قفل‌ها
+    for (final key in lockedKeys) {
+      _processingKeys.remove(key);
+    }
+    if (mounted) setState(() {});
+
+    // مدیریت نوتیفیکیشن‌ها فقط یک‌بار پس از اتمام حلقه گروهی
+    if (successCount > 0) {
+      try {
+        await NotificationService.cancelOverdueReminders(baseTask.routine['id']);
+
+        final repeatType = baseTask.routine['repeat_type'];
+        if (repeatType == 'interval' || repeatType == 'once') {
+          if (repeatType == 'once') {
+            await NotificationService.cancelRoutineNotifications(baseTask.routine['id']);
+          } else {
+            final res = await Supabase.instance.client
+                .from('completions')
+                .select()
+                .eq('user_id', user.id)
+                .eq('routine_id', baseTask.routine['id']);
+            final completions = List<Map<String, dynamic>>.from(res);
+            final next = nextDueDate(baseTask.routine, completions);
+            final petIds = baseTask.routine['pet_ids'] is List
+                ? List<String>.from(baseTask.routine['pet_ids'])
+                : <String>[];
+            final petNames = petIds.map((id) {
+              final p = _pets.firstWhere(
+                (element) => element['id'] == id,
+                orElse: () => <String, dynamic>{},
+              );
+              return _petName(p);
+            }).toList();
+
+            await NotificationService.scheduleRoutineNotifications(
+              baseTask.routine,
+              petNames: petNames,
+              overrideDate: next,
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Error managing group notifications: $e');
+      }
+    }
+
+    if (!mounted) return;
+
+    if (failCount == 0 && successCount > 0) {
+      AppFeedback.showSuccess(
+        context,
+        status == 'done'
+            ? 'کار برای همه ($successCount حیوان) ثبت شد ✅'
+            : 'کار برای همه ($successCount حیوان) رد شد ⏭️',
+      );
+    } else if (successCount > 0 && failCount > 0) {
+      AppFeedback.showError(
+        context,
+        'برای $successCount حیوان ثبت شد، ولی برای $failCount حیوان با خطا مواجه شد ⚠️',
+      );
+    } else if (failCount > 0 && successCount == 0) {
+      AppFeedback.showError(context, 'ثبت وضعیت کار گروهی انجام نشد');
+    }
+  }
+
+  Future<void> _markGroupDone(_TodayTask task) async {
+    await _respondGroup(task, 'done');
+  }
+
+  Future<void> _showGroupSkipDialog(_TodayTask task) async {
+    final noteController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: _surface,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: const BorderSide(color: _line, width: 1),
+            ),
+            title: const Text(
+              'رد کردن برای همه',
+              style: TextStyle(
+                color: _ink,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'چرا این بار برای همه انجامش نمی‌دی؟ (اختیاری)',
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: noteController,
+                  maxLines: 3,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 14,
+                  ),
+                  cursorColor: _terracotta,
+                  decoration: InputDecoration(
+                    hintText: 'مثلاً: تغییر برنامه غذایی برای همه',
+                    hintStyle: const TextStyle(
+                      color: _muted,
+                      fontSize: 13,
+                    ),
+                    filled: true,
+                    fillColor: _cream,
+                    contentPadding: const EdgeInsets.all(12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _line),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _terracotta, width: 1.5),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: _muted,
+                ),
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _terracotta,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('رد برای همه'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      final note = noteController.text.trim();
+      await _respondGroup(
+        task,
+        'skipped',
+        note: note.isEmpty ? null : note,
+      );
+    }
+
+    noteController.dispose();
+  }
 
 
   int get _remainingCount {
@@ -540,117 +789,150 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     );
   }
 
- Widget _buildTaskCard(_TodayTask task) {
-  final done = task.isDone;
-  final skipped = task.isSkipped;
-  final handled = done || skipped;
-  final taskKey = "${task.routine['id']}_${task.pet['id']}";
-  final isProcessing = _processingKeys.contains(taskKey);
+  Widget _buildTaskCard(_TodayTask task) {
+    final done = task.isDone;
+    final skipped = task.isSkipped;
+    final handled = done || skipped;
+    final taskKey = "${task.routine['id']}_${task.pet['id']}";
+    final isProcessing = _processingKeys.contains(taskKey);
 
-  return AnimatedOpacity(
-    duration: const Duration(milliseconds: 250),
-    opacity: handled ? 0.68 : 1,
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: handled ? _surface : _surfaceRaised,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: done
-              ? _forest.withOpacity(0.6)
-              : skipped
-                  ? _terracotta.withOpacity(0.55)
-                  : _line,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _sage,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(_routineIcon(task.routine), color: _moss, size: 20),
+    final eligiblePeers = !handled ? _getEligiblePeerTasks(task) : <_TodayTask>[];
+    final showGroupActions = eligiblePeers.length >= 2;
+    final isAnyPeerProcessing = eligiblePeers.any(
+      (p) => _processingKeys.contains("${p.routine['id']}_${p.pet['id']}"),
+    );
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 250),
+      opacity: handled ? 0.68 : 1,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: handled ? _surface : _surfaceRaised,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: done
+                ? _forest.withOpacity(0.6)
+                : skipped
+                    ? _terracotta.withOpacity(0.55)
+                    : _line,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        _petName(task.pet),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: _ink,
-          fontSize: 15,
-          fontWeight: FontWeight.w800,
         ),
-      ),
-
-      const SizedBox(height: 2),
-
-      Text(
-        _routineTitle(task.routine),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: _ink.withOpacity(0.85),
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          decoration: handled
-              ? TextDecoration.lineThrough
-              : null,
-        ),
-      ),
-
-      const SizedBox(height: 2),
-
-      Text(
-        skipped
-            ? '${_routineType(task.routine)} · رد شد'
-            : '${_routineType(task.routine)}'
-              '${task.routine['time'] != null ? ' · ${task.routine['time']}' : ''}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: _muted,
-          fontSize: 11.5,
-        ),
-      ),
-    ],
-  ),
-),
-          if (handled)
-            Icon(
-              done ? Icons.check_circle_rounded : Icons.cancel_rounded,
-              color: done ? _moss : _terracotta,
-              size: 22,
-            )
-          else
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  color: _muted,
-                  tooltip: 'رد شد',
-                  onPressed: isProcessing ? null : () => _showSkipDialog(task),),
-                IconButton(
-                  icon: const Icon(Icons.check_circle_outline),
-                  color: _terracotta,
-                  tooltip: 'انجام شد',
-                  onPressed: isProcessing ? null : () => _markDone(task),),
-              ],
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: _sage,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(_routineIcon(task.routine), color: _moss, size: 20),
             ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _petName(task.pet),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _routineTitle(task.routine),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _ink.withOpacity(0.85),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      decoration: handled ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    skipped
+                        ? '${_routineType(task.routine)} · رد شد'
+                        : '${_routineType(task.routine)}'
+                          '${task.routine['time'] != null ? ' · ${task.routine['time']}' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _muted,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (handled)
+              Icon(
+                done ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                color: done ? _moss : _terracotta,
+                size: 22,
+              )
+            else
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showGroupActions) ...[
+                    IconButton(
+                      icon: const Icon(Icons.close_fullscreen_rounded),
+                      color: _muted,
+                      iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      tooltip: 'رد برای همه',
+                      onPressed: isAnyPeerProcessing ? null : () => _showGroupSkipDialog(task),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.done_all_rounded),
+                      color: _terracotta,
+                      iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      tooltip: 'انجام برای همه',
+                      onPressed: isAnyPeerProcessing ? null : () => _markGroupDone(task),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(height: 16, width: 1, color: _line),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    color: _muted,
+                    iconSize: 22,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'رد شد',
+                    onPressed: isProcessing ? null : () => _showSkipDialog(task),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.check_circle_outline),
+                    color: _moss,
+                    iconSize: 22,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'انجام شد',
+                    onPressed: isProcessing ? null : () => _markDone(task),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 
 
   Widget _buildEmptyState() {
