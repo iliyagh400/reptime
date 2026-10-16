@@ -394,37 +394,94 @@ class _PetProfilePageState extends State<PetProfilePage> {
 
 
 
-  Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
+    Future<void> _showSkipDialog(Map<String, dynamic> routine) async {
     final noteController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('رد کردن این بار'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('چرا این بار انجامش نمی‌دی؟ (اختیاری)'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'مثلاً: این هفته در حال پوست‌اندازیه',
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: _surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: const BorderSide(color: _line, width: 1),
+          ),
+          title: const Text(
+            'رد کردن این بار',
+            style: TextStyle(
+              color: _text,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'چرا این بار انجامش نمی‌دی؟ (اختیاری)',
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 13,
+                ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                maxLines: 3,
+                style: const TextStyle(
+                  color: _text,
+                  fontSize: 14,
+                ),
+                cursorColor: _terracotta,
+                decoration: InputDecoration(
+                  hintText: 'مثلاً: این هفته در حال پوست‌اندازیه',
+                  hintStyle: const TextStyle(
+                    color: _muted,
+                    fontSize: 13,
+                  ),
+                  filled: true,
+                  fillColor: _background,
+                  contentPadding: const EdgeInsets.all(12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _line),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _terracotta, width: 1.5),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: _muted,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _terracotta,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('رد کن'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('رد کن'),
-          ),
-        ],
       ),
     );
     if (confirmed == true) {
@@ -432,6 +489,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
       await _respond(routine, 'skipped', note: note.isEmpty ? null : note);
     }
   }
+
  String _typeLabel(String type) {
   switch (type.toLowerCase().trim()) {
     case 'food':

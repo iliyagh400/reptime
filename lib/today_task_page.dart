@@ -348,54 +348,69 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     await _respond(task, 'done');
   }
 
-  Future<void> _showSkipDialog(_TodayTask task) async {
-    final noteController =
-        TextEditingController();
+    Future<void> _showSkipDialog(_TodayTask task) async {
+    final noteController = TextEditingController();
 
-    final confirmed =
-        await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             backgroundColor: _surface,
+            surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
+              side: const BorderSide(color: _line, width: 1),
             ),
             title: const Text(
               'رد کردن این بار',
               style: TextStyle(
                 color: _ink,
                 fontWeight: FontWeight.w800,
+                fontSize: 18,
               ),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'چرا این بار انجامش نمی‌دی؟ (اختیاری)',
                   style: TextStyle(
                     color: _muted,
+                    fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: noteController,
                   maxLines: 3,
-                  decoration:
-                      InputDecoration(
-                    hintText:
-                        'مثلاً: این هفته در حال پوست‌اندازیه',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 14,
+                  ),
+                  cursorColor: _terracotta,
+                  decoration: InputDecoration(
+                    hintText: 'مثلاً: این هفته در حال پوست‌اندازیه',
+                    hintStyle: const TextStyle(
+                      color: _muted,
+                      fontSize: 13,
+                    ),
                     filled: true,
                     fillColor: _cream,
+                    contentPadding: const EdgeInsets.all(12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _line),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _terracotta, width: 1.5),
+                    ),
                     border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(16),
-                      borderSide:
-                          BorderSide.none,
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
@@ -403,8 +418,10 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
             ),
             actions: [
               TextButton(
-                onPressed: () =>
-                    Navigator.pop(
+                style: TextButton.styleFrom(
+                  foregroundColor: _muted,
+                ),
+                onPressed: () => Navigator.pop(
                   dialogContext,
                   false,
                 ),
@@ -412,16 +429,14 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor:
-                      _terracotta,
-                  shape:
-                      RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(12),
+                  backgroundColor: _terracotta,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 0,
                 ),
-                onPressed: () =>
-                    Navigator.pop(
+                onPressed: () => Navigator.pop(
                   dialogContext,
                   true,
                 ),
@@ -434,8 +449,7 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
     );
 
     if (confirmed == true) {
-      final note =
-          noteController.text.trim();
+      final note = noteController.text.trim();
 
       await _respond(
         task,
@@ -443,8 +457,6 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
         note: note.isEmpty ? null : note,
       );
     }
-
-    noteController.dispose();
   }
 
   Widget _buildHeader() {
