@@ -102,7 +102,7 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
       for (final c in (completionsRes as List)) {
         final dateStr = c['completed_at']?.toString();
         if (dateStr == null) continue;
-        final date = DateTime.tryParse(dateStr);
+        final date = DateTime.tryParse(dateStr)?.toLocal();
         if (date == null) continue;
 
         final routine = routinesById[c['routine_id']];
@@ -124,7 +124,7 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
       for (final ev in (eventsRes as List)) {
         final dateStr = ev['event_date']?.toString();
         if (dateStr == null) continue;
-        final date = DateTime.tryParse(dateStr);
+        final date = DateTime.tryParse(dateStr)?.toLocal();
         if (date == null) continue;
 
         list.add({
@@ -139,7 +139,7 @@ class _PetHistoryPageState extends State<PetHistoryPage> {
       for (final ch in (checkinsRes as List)) {
         final dateStr = ch['checkin_date']?.toString();
         if (dateStr == null) continue;
-        final date = DateTime.tryParse(dateStr);
+        final date = DateTime.tryParse(dateStr)?.toLocal();
         if (date == null) continue;
 
         final weight = ch['weight'];

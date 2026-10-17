@@ -130,7 +130,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
         return today.add(Duration(days: intervalDays));
       } else {
         final start = routine['start_date'] != null
-            ? DateTime.tryParse(routine['start_date'].toString())
+            ? DateTime.tryParse(routine['start_date'].toString())?.toLocal()
             : null;
         if (start != null) {
           final startDate = DateTime(start.year, start.month, start.day);

@@ -22,18 +22,46 @@ class NotificationService {
       tz_data.initializeTimeZones();
 
       // خواندن امن تایم‌زون سازگار با flutter_timezone 5.x و نسخه های قبل
+            // خواندن امن و ضدگلوله تایم‌زون
       try {
         final dynamic tzRes = await FlutterTimezone.getLocalTimezone();
-        final String timeZoneName =
-            (tzRes is String) ? tzRes : (tzRes?.identifier ?? 'UTC');
-        tz.setLocalLocation(tz.getLocation(timeZoneName));
+        final String? timeZoneName =
+            (tzRes is String) ? tzRes : tzRes?.identifier?.toString();
+        if (timeZoneName != null && timeZoneName.isNotEmpty) {
+          tz.setLocalLocation(tz.getLocation(timeZoneName));
+          if (kDebugMode) {
+            debugPrint('NotificationService: Timezone set to $timeZoneName');
+          }
+        } else {
+          throw Exception('Empty timezone name');
+        }
       } catch (_) {
+        // در صورت بروز خطا، بر اساس آفست واقعی دستگاه ست می‌کنیم تا به UTC نیافتد
         try {
-          tz.setLocalLocation(tz.getLocation('UTC'));
+          final offsetMinutes = DateTime.now().timeZoneOffset.inMinutes;
+          String fallbackZone = 'UTC';
+          if (offsetMinutes == 210) {
+            fallbackZone = 'Asia/Tehran'; // ایران (UTC+3:30)
+          } else if (offsetMinutes == 270) {
+            fallbackZone = 'Asia/Kabul';
+          } else if (offsetMinutes == 330) {
+            fallbackZone = 'Asia/Kolkata';
+          } else if (offsetMinutes == 240) {
+            fallbackZone = 'Asia/Dubai';
+          } else if (offsetMinutes == 180) {
+            fallbackZone = 'Asia/Riyadh';
+          }
+          tz.setLocalLocation(tz.getLocation(fallbackZone));
+          if (kDebugMode) {
+            debugPrint('NotificationService: Fallback timezone set to $fallbackZone');
+          }
         } catch (_) {
-          // در صورت بروز هرگونه استثنا، لوکیشن فعلی حفظ می‌شود
+          try {
+            tz.setLocalLocation(tz.getLocation('UTC'));
+          } catch (_) {}
         }
       }
+
 
       const androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -394,13 +422,14 @@ class NotificationService {
 
         case 'interval':
         case 'once':
-          tz.TZDateTime scheduledDate;
+           tz.TZDateTime scheduledDate;
           if (overrideDate != null) {
+            final localDate = overrideDate.toLocal();
             scheduledDate = tz.TZDateTime(
               tz.local,
-              overrideDate.year,
-              overrideDate.month,
-              overrideDate.day,
+              localDate.year,
+              localDate.month,
+              localDate.day,
               hour,
               minute,
             );
