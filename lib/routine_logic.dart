@@ -253,4 +253,57 @@ DateTime? nextDueDate(
     default:
       return null;
   }
+}/// پیدا کردن آخرین رکورد انجام موفق ('done') برای یک روتین مشخص
+DateTime? lastSuccessfulCompletionDate(
+  dynamic routine, {
+  required List<dynamic> completions,
+}) {
+  final routineId = routine is Map ? routine['id']?.toString() : routine?.toString();
+  if (routineId == null || routineId.isEmpty) return null;
+
+  DateTime? latest;
+  for (final raw in completions) {
+    if (raw is! Map) continue;
+    if (raw['routine_id']?.toString() != routineId) continue;
+    
+    final status = raw['status']?.toString();
+    // فقط وضعیت done (انجام موفق) معتبر است
+    if (status != 'done' && status != 'completed') continue;
+
+    final parsed = _tryParseDate(raw['completed_at']);
+    if (parsed == null) continue;
+
+    if (latest == null || parsed.isAfter(latest)) {
+      latest = parsed;
+    }
+  }
+  return latest;
 }
+
+/// تولید متن فارسی خوانا برای آخرین زمان انجام موفق بر اساس روزهای تقویمی محلی
+String formatLastCompletionText(DateTime? lastDoneDate) {
+  if (lastDoneDate == null) {
+    return 'هنوز انجام نشده';
+  }
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final completionDay = DateTime(
+    lastDoneDate.year,
+    lastDoneDate.month,
+    lastDoneDate.day,
+  );
+
+  final differenceInDays = today.difference(completionDay).inDays;
+
+  if (differenceInDays == 0) {
+    return 'آخرین بار امروز انجام شد';
+  } else if (differenceInDays == 1) {
+    return 'آخرین بار دیروز انجام شد';
+  } else if (differenceInDays > 1) {
+    return 'آخرین بار $differenceInDays روز پیش انجام شد';
+  } else {
+    return 'آخرین بار امروز انجام شد';
+  }
+}
+

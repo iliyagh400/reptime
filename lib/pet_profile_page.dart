@@ -190,10 +190,15 @@ class _PetProfilePageState extends State<PetProfilePage> {
         }
 
         final nextDate = _calculateNextOccurrence(routine, completions);
+        final lastDoneDate = lastSuccessfulCompletionDate(
+            routine,
+            completions: completions,
+          );
         if (nextDate != null) {
           upcomingList.add({
             ...routine,
             'nextDueDate': nextDate,
+            'lastDoneText': formatLastCompletionText(lastDoneDate),
           });
         }
       }
@@ -674,7 +679,7 @@ class _PetProfilePageState extends State<PetProfilePage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
+                                                                 Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -682,21 +687,35 @@ class _PetProfilePageState extends State<PetProfilePage> {
                               r['title'] ?? '',
                               style: TextStyle(
                                 color: _text.withValues(alpha: 0.75),
-                                fontSize: 15,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'موعد بعدی: $dateStr',
+                              nextDate != null
+                                  ? 'موعد بعدی: ${nextDate.toLocal().toString().split(' ')[0]}'
+                                  : 'بدون موعد مشخص',
                               style: const TextStyle(
                                 color: _muted,
                                 fontSize: 12,
                               ),
                             ),
+                            if (r['lastDoneText'] != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                r['lastDoneText'] as String,
+                                style: TextStyle(
+                                  color: _muted.withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
+
+
                       Icon(
                         Icons.chevron_left,
                         color: _muted.withValues(alpha: 0.6),
