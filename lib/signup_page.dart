@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_feedback.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -40,7 +41,7 @@ class _SignupPageState extends State<SignupPage> {
   static const _line = Color(0xFF3A463C);
   static const _errorColor = Color(0xFFE57373); // رنگ ارور هماهنگ با تم
 
-  static const String _supportTelegramId = '@ReptimeSupport';
+  static const String _supportTelegramId = '@Reptime_support';
 
   @override
   void dispose() {
@@ -585,6 +586,97 @@ class _SignupPageState extends State<SignupPage> {
                                 ),
                               ),
                               const SizedBox(height: 18),
+                                            // باکس اعلان اشتراک
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _forest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _sand.withValues(alpha: 0.35),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.workspace_premium_rounded,
+                          color: _sand,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'نیاز به اشتراک فعال',
+                          style: TextStyle(
+                            color: _sand,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'برای ثبت‌نام و استفاده از امکانات برنامه، ابتدا باید از طریق پشتیبانی تلگرام اشتراک تهیه فرمایید.',
+                      style: TextStyle(
+                        color: _muted.withValues(alpha: 0.95),
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: _openSupportTelegram,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _line.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.send_rounded,
+                              color: Color(0xFF67B77C),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            const Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Text(
+                                _supportTelegramId,
+                                style: TextStyle(
+                                  color: _text,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '| ارتباط با پشتیبانی',
+                              style: TextStyle(
+                                color: _sand.withValues(alpha: 0.9),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
                               // فیلد ایمیل با هدر ارور
                               _buildFieldHeader('ایمیل', _emailError),
@@ -767,4 +859,39 @@ class _SignupPageState extends State<SignupPage> {
       ),
     );
   }
+  Future<void> _openSupportTelegram() async {
+  final uri = Uri.parse('https://t.me/Reptime_support');
+
+  try {
+    var opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    // اگر اپ تلگرام باز نشد، لینک را با روش پیش‌فرض سیستم امتحان کن.
+    if (!opened) {
+      opened = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+      );
+    }
+
+    if (!opened && mounted) {
+      AppFeedback.show(
+        context,
+        'باز کردن لینک پشتیبانی ممکن نشد',
+        isError: true,
+      );
+    }
+  } catch (_) {
+    if (mounted) {
+      AppFeedback.show(
+        context,
+        'خطا در باز کردن لینک پشتیبانی',
+        isError: true,
+      );
+    }
+  }
+}
+
 }

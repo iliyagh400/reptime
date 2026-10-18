@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
 import 'app_feedback.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -188,6 +189,49 @@ class _SettingsPageState extends State<SettingsPage> {
                       },
                     ),
                   ),
+                                _buildSectionLabel('پشتیبانی'),
+              _buildCard(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
+                  ),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _terracotta.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.send_rounded,
+                      color: _terracotta,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text(
+                    'پشتیبانی تلگرام',
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '@Reptime_support',
+                    style: TextStyle(
+                      color: _muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: _muted,
+                  ),
+                  onTap: _openTelegramSupport,
+                ),
+              ),
+
                 ],
               ),
       ),
@@ -296,4 +340,30 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _saveBool(String key, bool value) async => (await SharedPreferences.getInstance()).setBool(key, value);
   Future<void> _saveInt(String key, int value) async => (await SharedPreferences.getInstance()).setInt(key, value);
+    Future<void> _openTelegramSupport() async {
+    final uri = Uri.parse('https://t.me/Reptime_support');
+    try {
+      // ابتدا تلاش برای باز کردن مستقیم در اپ تلگرام
+      final launchedApp = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      // در صورت عدم موفقیت، فال‌بک به مرورگر
+      if (!launchedApp) {
+        final launchedBrowser = await launchUrl(
+          uri,
+          mode: LaunchMode.platformDefault,
+        );
+        if (!launchedBrowser && mounted) {
+          _showSnack('امکان باز کردن تلگرام وجود ندارد', isError: true);
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        _showSnack('خطا در باز کردن تلگرام', isError: true);
+      }
+    }
+  }
+
 }
