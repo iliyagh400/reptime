@@ -629,51 +629,56 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    InkWell(
-                      onTap: _openSupportTelegram,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _line.withValues(alpha: 0.6),
-                          ),
+                                      InkWell(
+                    onTap: _openSupportTelegram,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _surfaceRaised,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _line.withValues(alpha: 0.6),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        textDirection: TextDirection.ltr,
+                        children: [
+                          Transform.scale(
+                            scaleX: -1,
+                            child: const Icon(
                               Icons.send_rounded,
                               color: Color(0xFF67B77C),
                               size: 16,
                             ),
-                            const SizedBox(width: 6),
-                            const Directionality(
-                              textDirection: TextDirection.ltr,
-                              child: Text(
-                                _supportTelegramId,
-                                style: TextStyle(
-                                  color: _text,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            _supportTelegramId,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '| ارتباط با پشتیبانی',
-                              style: TextStyle(
-                                color: _sand.withValues(alpha: 0.9),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '| ارتباط با پشتیبانی',
+                            style: TextStyle(
+                              color: _sand.withValues(alpha: 0.9),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
+
                   ],
                 ),
               ),

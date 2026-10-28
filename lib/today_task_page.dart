@@ -880,53 +880,83 @@ class _TodayTasksPageState extends State<TodayTasksPage> {
                 size: 22,
               )
             else
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (showGroupActions) ...[
-                    IconButton(
-                      icon: const Icon(Icons.close_fullscreen_rounded),
-                      color: _muted,
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'رد برای همه',
-                      onPressed: isAnyPeerProcessing ? null : () => _showGroupSkipDialog(task),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.done_all_rounded),
-                      color: _terracotta,
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'انجام برای همه',
-                      onPressed: isAnyPeerProcessing ? null : () => _markGroupDone(task),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(height: 16, width: 1, color: _line),
-                    const SizedBox(width: 4),
-                  ],
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    color: _muted,
-                    iconSize: 22,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'رد شد',
-                    onPressed: isProcessing ? null : () => _showSkipDialog(task),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(Icons.check_circle_outline),
-                    color: _moss,
-                    iconSize: 22,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'انجام شد',
-                    onPressed: isProcessing ? null : () => _markDone(task),
-                  ),
-                ],
+  Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      // ردیف اول: دکمه‌های تکی (اصلی)
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.close_rounded),
+            color: _muted,
+            iconSize: 22,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 32,
+              minHeight: 32,
+            ),
+            tooltip: 'رد شد',
+            onPressed: isProcessing ? null : () => _showSkipDialog(task),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.check_circle_outline),
+            color: _moss,
+            iconSize: 22,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 32,
+              minHeight: 32,
+            ),
+            tooltip: 'انجام شد',
+            onPressed: isProcessing ? null : () => _markDone(task),
+          ),
+        ],
+      ),
+      
+      // ردیف دوم: دکمه‌های گروهی (برای همه) - اگر فعال باشند
+      if (showGroupActions) ...[
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.close_fullscreen_rounded),
+              color: _muted,
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 28,
+                minHeight: 28,
               ),
+              tooltip: 'رد برای همه',
+              onPressed: isAnyPeerProcessing
+                  ? null
+                  : () => _showGroupSkipDialog(task),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.done_all_rounded),
+              color: _terracotta,
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 28,
+                minHeight: 28,
+              ),
+              tooltip: 'انجام برای همه',
+              onPressed: isAnyPeerProcessing
+                  ? null
+                  : () => _markGroupDone(task),
+            ),
+          ],
+        ),
+      ],
+    ],
+  ),
+
           ],
         ),
       ),
